@@ -23,13 +23,12 @@ Respond with exactly one word: YES or NO.`;
 
 export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefined): Promise<boolean> {
 	if (!bodyHtml) return false;
-	
+
 	const plainText = stripHtmlToText(bodyHtml).trim();
 	if (plainText.length < 10) return false;
 
 	try {
 		const response = (await ai.run(
-			// @ts-expect-error — model string not in generated union
 			"@cf/meta/llama-3.1-8b-instruct-fast",
 			{
 				messages: [
@@ -42,7 +41,7 @@ export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefi
 		)) as { response?: string };
 
 		const result = (response?.response || "NO").trim().toUpperCase();
-		
+
 		if (result.includes("YES")) {
 			console.warn("Prompt injection detected in incoming email, blocking auto-draft");
 			return true;
