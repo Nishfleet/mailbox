@@ -65,16 +65,30 @@ def api(method: str, path: str, body: dict[str, Any] | None = None) -> dict[str,
 
 
 def zone_records(zone_id: str) -> list[dict[str, Any]]:
-    return api("GET", f"/zones/{zone_id}/dns_records?per_page=100")["result"]
+    records: list[dict[str, Any]] = []
+    page = 1
+    while True:
+        payload = api("GET", f"/zones/{zone_id}/dns_records?per_page=100&page={page}")
+        records.extend(payload.get("result") or [])
+        info = payload.get("result_info") or {}
+        total_pages = int(info.get("total_pages") or page)
+        if page >= total_pages:
+            return records
+        page += 1
+
+
+def routing_dns_report(zone_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    result = api("GET", f"/zones/{zone_id}/email/routing/dns").get("result")
+    if isinstance(result, list):
+        return result, []
+    if isinstance(result, dict):
+        return result.get("record") or [], result.get("errors") or []
+    return [], []
 
 
 def routing_dns_records(zone_id: str) -> list[dict[str, Any]]:
-    result = api("GET", f"/zones/{zone_id}/email/routing/dns").get("result")
-    if isinstance(result, list):
-        return result
-    if isinstance(result, dict):
-        return result.get("record") or []
-    return []
+    records, _errors = routing_dns_report(zone_id)
+    return records
 
 
 def worker_action_enabled(rule: dict[str, Any] | None, worker_name: str) -> bool:
@@ -83,7 +97,9 @@ def worker_action_enabled(rule: dict[str, Any] | None, worker_name: str) -> bool
     for action in rule.get("actions") or []:
         if action.get("type") != "worker":
             continue
-        if worker_name in json.dumps(action.get("value") or []):
+        value = action.get("value") or []
+        values = value if isinstance(value, list) else [value]
+        if any(item == worker_name for item in values):
             return True
     return False
 
@@ -175,6 +191,10 @@ def upsert_spf(zone_id: str, zone_name: str, records: list[dict[str, Any]], appl
 
 
 def verify_cloudflare_records(zone_id: str, zone_name: str, required_mx: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    _required_records, missing_routing_records = routing_dns_report(zone_id)
+    if missing_routing_records:
+        raise RuntimeError(f"{zone_name}: Cloudflare still reports missing Email Routing DNS records: {missing_routing_records}")
+
     records = zone_records(zone_id)
     existing_mx = {record.get("content") for record in root_records(records, zone_name, "MX")}
     missing_mx = [record.get("content") for record in required_mx if record.get("content") not in existing_mx]

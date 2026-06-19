@@ -55,8 +55,16 @@ print("3. Service Auth policy added")
 
 # 4. save credentials
 out = pathlib.Path(os.path.expanduser("~/.config/cloudflare/inbox-mcp-service-token.json"))
-out.write_text(json.dumps({"client_id": client_id, "client_secret": client_secret}))
-out.chmod(0o600)
+out.parent.mkdir(parents=True, exist_ok=True)
+fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        fd = None
+        json.dump({"client_id": client_id, "client_secret": client_secret}, handle)
+finally:
+    if fd is not None:
+        os.close(fd)
 print(f"4. credentials saved to {out}")
 print()
 print("Done. Tell Claude 'done' and it will connect itself to the inbox MCP.")
