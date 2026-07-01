@@ -20,6 +20,8 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { buildAttentionSummary } from "./lib/attention";
+import { mapWithConcurrency } from "./lib/async";
 
 type AppContext = Context<MailboxContext>;
 
@@ -43,6 +45,9 @@ const DraftBody = z.object({
 });
 
 const MAILBOX_COUNT_TIMEOUT_MS = 5000;
+const MAILBOX_COUNT_CONCURRENCY = 6;
+const MAILBOX_LIST_BUDGET_MS = 12000;
+const MAILBOX_COUNT_START_BUFFER_MS = 500;
 
 // -- Helpers --------------------------------------------------------
 
@@ -81,12 +86,16 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout:
 	}
 }
 
-async function getInboxUnreadCount(env: Env, mailboxId: string): Promise<number | null> {
+async function getInboxUnreadCount(
+	env: Env,
+	mailboxId: string,
+	timeoutMs: number = MAILBOX_COUNT_TIMEOUT_MS,
+): Promise<number | null> {
 	try {
 		const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
 		return await withTimeout(
 			stub.getInboxUnreadCount(),
-			MAILBOX_COUNT_TIMEOUT_MS,
+			timeoutMs,
 			() => console.warn(`Timed out loading unread inbox count for ${mailboxId}`),
 		);
 	} catch (error) {
@@ -127,15 +136,42 @@ app.get("/api/v1/config", (c) => {
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
-	const allMailboxes = await listMailboxes(c.env.BUCKET);
-	const mailboxes = await Promise.all(
-		allMailboxes.map(async (m) => ({
-			...m,
-			name: m.id,
-			unreadInboxCount: await getInboxUnreadCount(c.env, m.id),
-		})),
+	const deadlineMs = Date.now() + MAILBOX_LIST_BUDGET_MS;
+	const directoryBudgetMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
+	const allMailboxes = directoryBudgetMs > 0
+		? await withTimeout(
+				listMailboxes(c.env.BUCKET),
+				directoryBudgetMs,
+				() => console.warn("Timed out loading mailbox directory"),
+			)
+		: null;
+	if (!allMailboxes) {
+		return c.json({ error: "Mailbox directory unavailable" }, 503);
+	}
+	const mailboxes = await mapWithConcurrency(
+		allMailboxes,
+		MAILBOX_COUNT_CONCURRENCY,
+		async (m) => {
+			const remainingMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
+			return {
+				...m,
+				name: m.id,
+				unreadInboxCount:
+					remainingMs > 0
+						? await getInboxUnreadCount(
+								c.env,
+								m.id,
+								Math.min(MAILBOX_COUNT_TIMEOUT_MS, remainingMs),
+							)
+						: null,
+			};
+		},
 	);
 	return c.json(mailboxes);
+});
+
+app.get("/api/v1/attention", async (c) => {
+	return c.json(await buildAttentionSummary(c.env));
 });
 
 app.post("/api/v1/mailboxes", async (c) => {

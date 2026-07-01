@@ -102,6 +102,7 @@ function useInvalidateEmailData() {
 			queryKey: queryKeys.folders.list(mailboxId),
 		});
 		qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+		qc.invalidateQueries({ queryKey: queryKeys.attention });
 	};
 }
 
@@ -185,6 +186,7 @@ export function useUpdateEmail() {
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
 			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			qc.invalidateQueries({ queryKey: queryKeys.attention });
 		},
 	});
 }
@@ -203,6 +205,7 @@ export function useMarkThreadRead() {
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
 			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			qc.invalidateQueries({ queryKey: queryKeys.attention });
 		},
 	});
 }

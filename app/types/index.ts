@@ -24,6 +24,75 @@ export interface Mailbox {
 	settings?: MailboxSettings;
 }
 
+export type AttentionBucketId =
+	| "act_now"
+	| "money"
+	| "leads"
+	| "aging"
+	| "drafts_ready";
+
+export interface AttentionItem {
+	id: string;
+	mailboxId: string;
+	emailId: string;
+	threadId?: string | null;
+	folderId: string;
+	bucket: AttentionBucketId;
+	subject: string;
+	sender: string;
+	recipient: string;
+	date: string;
+	reason: string;
+	confidence: "high" | "medium";
+}
+
+export interface AttentionBucket {
+	id: AttentionBucketId;
+	label: string;
+	description: string;
+	count: number;
+	mailboxCount: number;
+	topItems: AttentionItem[];
+	topItemsLimit: number;
+	topItemsSampled: boolean;
+	hasMoreTopItems: boolean;
+}
+
+export interface MailboxAttentionSummary {
+	mailboxId: string;
+	email: string;
+	status: "ok" | "unavailable";
+	unreadInboxCount: number | null;
+	needsReplyCount: number | null;
+	draftCount: number | null;
+	moneyCount: number | null;
+	leadCount: number | null;
+	agingCount: number | null;
+	oldestPendingAt?: string | null;
+	lastInboundAt?: string | null;
+	newestDraftAt?: string | null;
+	topItems: AttentionItem[];
+	topItemsLimit: number;
+	topItemsSampled: boolean;
+	hasMoreTopItems: boolean;
+}
+
+export interface AttentionSummary {
+	generatedAt: string;
+	triageVersion: string;
+	mailboxCount: number;
+	mailboxDirectoryStatus: "ok" | "unavailable";
+	unavailableMailboxCount: number;
+	attentionSignalCount: number;
+	buckets: AttentionBucket[];
+	mailboxes: MailboxAttentionSummary[];
+	topItems: AttentionItem[];
+	topItemsLimit: number;
+	topItemsSampled: boolean;
+	hasMoreTopItems: boolean;
+	warnings: string[];
+}
+
 export interface Email {
 	id: string;
 	thread_id?: string | null;

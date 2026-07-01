@@ -20,6 +20,7 @@ import {
 } from "../lib/email-helpers";
 import {
 	toolListEmails,
+	toolGetAttentionSummary,
 	toolGetEmail,
 	toolGetThread,
 	toolSearchEmails,
@@ -51,6 +52,8 @@ function defineTool(def: {
  * Users can override this on a per-mailbox basis via the Settings UI.
  */
 const DEFAULT_SYSTEM_PROMPT = `You are an email assistant that helps manage this inbox. You read emails, draft replies, and help organize conversations.
+
+Use get_attention_summary when the operator asks what needs attention across mailboxes or where to start. It returns cross-mailbox signal buckets and sampled top items; inspect individual mailboxes or threads before drafting.
 
 ## Writing Style
 Write like a real person. Short, direct, flowing prose. Get to the point. Plain text only - no HTML tags in your replies.
@@ -107,8 +110,21 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
 	return DEFAULT_SYSTEM_PROMPT;
 }
 
-function createEmailTools(env: Env, mailboxId: string) {
-	return {
+function createEmailTools(
+	env: Env,
+	mailboxId: string,
+	options: { includeAttentionSummary?: boolean } = {},
+) {
+	const attentionSummaryTool = defineTool({
+		description:
+			"Summarize what needs attention across all mailboxes. Returns cross-mailbox triage buckets, mailbox status, sampled top items, and unavailable checks.",
+		parameters: z.object({}),
+		execute: async (): Promise<unknown> => {
+			return toolGetAttentionSummary(env);
+		},
+	});
+
+	const mailboxTools = {
 		list_emails: defineTool({
 			description:
 				"List emails in a folder. Returns email metadata (id, subject, sender, recipient, date, read/starred status, thread_id). Use folder='inbox' for received emails, 'sent' for sent emails.",
@@ -267,6 +283,10 @@ function createEmailTools(env: Env, mailboxId: string) {
 			},
 		}),
 	};
+
+	return options.includeAttentionSummary
+		? { get_attention_summary: attentionSummaryTool, ...mailboxTools }
+		: mailboxTools;
 }
 
 // Use `any` for the Env generic to avoid type conflicts between the custom
@@ -277,7 +297,9 @@ export class EmailAgent extends AIChatAgent<any> {
 		const env = this.env as Env;
 		const mailboxId = this.name;
 		const workersai = createWorkersAI({ binding: env.AI });
-		const tools = createEmailTools(env, mailboxId);
+		const tools = createEmailTools(env, mailboxId, {
+			includeAttentionSummary: true,
+		});
 		const systemPrompt = await getSystemPrompt(env, mailboxId);
 
 		const result = streamText({

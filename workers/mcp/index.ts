@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
 	toolListMailboxes,
+	toolGetAttentionSummary,
 	toolListEmails,
 	toolGetEmail,
 	toolGetThread,
@@ -89,6 +90,17 @@ export class EmailMCP extends McpAgent<Env> {
 			{},
 			async () => {
 				const result = await toolListMailboxes(env);
+				return mcpText(result);
+			},
+		);
+
+		// ── get_attention_summary ─────────────────────────────────
+		this.server.tool(
+			"get_attention_summary",
+			"Summarize what needs attention across all mailboxes. Returns triage buckets, mailbox status, top items, and unavailable checks. Use this before opening individual inboxes.",
+			{},
+			async () => {
+				const result = await toolGetAttentionSummary(env);
 				return mcpText(result);
 			},
 		);

@@ -26,6 +26,10 @@ import { useUIStore } from "~/hooks/useUIStore";
 import type { UIMessage } from "ai";
 
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+	get_attention_summary: {
+		label: "Checking attention",
+		icon: <CheckCircleIcon size={14} weight="bold" />,
+	},
 	list_emails: {
 		label: "Fetching emails",
 		icon: <EnvelopeSimpleIcon size={14} weight="bold" />,

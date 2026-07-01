@@ -6,24 +6,38 @@ import {
 	Badge,
 	Button,
 	Dialog,
-	Empty,
 	Input,
 	Loader,
 	Select,
 	Text,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+	ArrowRightIcon,
+	CheckCircleIcon,
+	ClockIcon,
+	EnvelopeIcon,
+	FileTextIcon,
+	HandCoinsIcon,
+	LightningIcon,
+	PlusIcon,
+	TrashIcon,
+	UsersIcon,
+	WarningCircleIcon,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
+import { formatListDate } from "shared/dates";
 import api from "~/services/api";
+import { useAttentionSummary } from "~/queries/attention";
 import {
 	useCreateMailbox,
 	useDeleteMailbox,
 	useMailboxes,
 } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
+import type { AttentionBucket, AttentionBucketId, AttentionItem } from "~/types";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
@@ -58,6 +72,192 @@ function MailboxPendingStatus({ count }: { count?: number | null }) {
 		<span className="whitespace-nowrap text-xs font-medium text-kumo-subtle">
 			No pending
 		</span>
+	);
+}
+
+const BUCKET_ICONS: Record<AttentionBucketId, ReactNode> = {
+	act_now: <LightningIcon size={16} weight="bold" />,
+	money: <HandCoinsIcon size={16} weight="bold" />,
+	leads: <UsersIcon size={16} weight="bold" />,
+	aging: <ClockIcon size={16} weight="bold" />,
+	drafts_ready: <FileTextIcon size={16} weight="bold" />,
+};
+
+const BUCKET_FOLDER: Record<AttentionBucketId, string> = {
+	act_now: "inbox",
+	money: "inbox",
+	leads: "inbox",
+	aging: "inbox",
+	drafts_ready: "draft",
+};
+
+function AttentionBucketRow({ bucket }: { bucket: AttentionBucket }) {
+	const topItem = bucket.topItems[0];
+	const targetMailbox = topItem?.mailboxId;
+	const targetFolder = topItem?.folderId || BUCKET_FOLDER[bucket.id];
+	const row = (
+		<div className="flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-kumo-tint">
+			<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
+				{BUCKET_ICONS[bucket.id]}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center gap-2">
+					<span className="truncate text-sm font-semibold text-kumo-default">
+						{bucket.label}
+					</span>
+					{bucket.count > 0 && (
+						<Badge variant="secondary">
+							{bucket.count}
+						</Badge>
+					)}
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{topItem
+						? `${topItem.mailboxId} · ${topItem.reason}`
+						: bucket.description}
+				</div>
+			</div>
+			{targetMailbox && (
+				<ArrowRightIcon
+					size={16}
+					className="shrink-0 text-kumo-subtle"
+				/>
+			)}
+		</div>
+	);
+
+	if (!targetMailbox) return row;
+
+	return (
+		<RouterLink
+			to={`/mailbox/${targetMailbox}/emails/${targetFolder}`}
+			className="block no-underline"
+		>
+			{row}
+		</RouterLink>
+	);
+}
+
+function AttentionItemRow({ item }: { item: AttentionItem }) {
+	return (
+		<RouterLink
+			to={`/mailbox/${item.mailboxId}/emails/${item.folderId}`}
+			className="flex items-center gap-3 rounded-md px-3 py-2 no-underline transition-colors hover:bg-kumo-tint"
+		>
+			<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
+				{BUCKET_ICONS[item.bucket]}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="truncate text-sm font-medium text-kumo-default">
+					{item.subject}
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{item.mailboxId} · {item.sender || item.recipient} · {item.reason}
+				</div>
+			</div>
+			<div className="shrink-0 text-xs text-kumo-subtle">
+				{formatListDate(item.date)}
+			</div>
+		</RouterLink>
+	);
+}
+
+function AttentionDesk() {
+	const {
+		data: attention,
+		isLoading,
+		isError,
+	} = useAttentionSummary();
+
+	if (isLoading) {
+		return (
+			<div className="mb-6 rounded-xl border border-kumo-line bg-kumo-base p-5">
+				<div className="flex items-center gap-3">
+					<Loader size="sm" />
+					<span className="text-sm font-medium text-kumo-subtle">
+						Checking all mailboxes...
+					</span>
+				</div>
+			</div>
+		);
+	}
+
+	if (isError || !attention) {
+		return (
+			<div className="mb-6 rounded-xl border border-kumo-line bg-kumo-base p-5">
+				<div className="flex items-center gap-3 text-kumo-subtle">
+					<WarningCircleIcon size={18} />
+					<span className="text-sm font-medium">
+						Attention check unavailable
+					</span>
+				</div>
+			</div>
+		);
+	}
+
+	const hasAttention = attention.buckets.some((bucket) => bucket.count > 0);
+	const unavailableMailboxes = attention.mailboxes.filter(
+		(mailbox) => mailbox.status === "unavailable",
+	);
+	const hasUnknown =
+		attention.mailboxDirectoryStatus !== "ok" || unavailableMailboxes.length > 0;
+
+	return (
+		<div className="mb-6 rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
+			<div className="flex flex-col gap-3 border-b border-kumo-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<div className="flex items-center gap-2">
+						<h2 className="text-base font-semibold text-kumo-default">
+							Attention Desk
+						</h2>
+						{hasAttention ? (
+							<Badge variant="secondary">
+								{hasUnknown ? "Partial: " : ""}{attention.attentionSignalCount} signals
+							</Badge>
+						) : hasUnknown ? (
+							<span className="inline-flex items-center gap-1 text-xs font-medium text-kumo-subtle">
+								<WarningCircleIcon size={14} />
+								Partial check
+							</span>
+						) : (
+							<span className="inline-flex items-center gap-1 text-xs font-medium text-kumo-subtle">
+								<CheckCircleIcon size={14} />
+								All clear
+							</span>
+						)}
+					</div>
+					<p className="mt-1 text-sm text-kumo-subtle">
+						{attention.mailboxCount} mailboxes · {attention.triageVersion}
+					</p>
+				</div>
+				{unavailableMailboxes.length > 0 && (
+					<div className="flex items-center gap-2 text-xs font-medium text-kumo-subtle">
+						<WarningCircleIcon size={16} />
+						{unavailableMailboxes.length} check unavailable
+					</div>
+				)}
+				{attention.mailboxDirectoryStatus !== "ok" && (
+					<div className="flex items-center gap-2 text-xs font-medium text-kumo-subtle">
+						<WarningCircleIcon size={16} />
+						Mailbox list unavailable
+					</div>
+				)}
+			</div>
+
+			<div className="grid divide-y divide-kumo-line sm:grid-cols-5 sm:divide-x sm:divide-y-0">
+				{attention.buckets.map((bucket) => (
+					<AttentionBucketRow key={bucket.id} bucket={bucket} />
+				))}
+			</div>
+
+			{attention.topItems.length > 0 && (
+				<div className="border-t border-kumo-line px-2 py-2">
+					{attention.topItems.slice(0, 5).map((item) => (
+						<AttentionItemRow key={item.id} item={item} />
+					))}
+				</div>
+			)}
+		</div>
 	);
 }
 
@@ -204,6 +404,8 @@ export default function HomeRoute() {
 						</p>
 					)}
 				</div>
+
+				<AttentionDesk />
 
 				{isLoading ? (
 					<div className="flex justify-center py-20">

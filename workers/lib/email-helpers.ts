@@ -14,6 +14,8 @@ import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { formatQuotedDate } from "../../shared/dates";
 
+const MAILBOX_LIST_PAGE_LIMIT = 100;
+
 // ── DO Stub ────────────────────────────────────────────────────────
 
 /**
@@ -37,8 +39,31 @@ export function getMailboxStub(
 export async function listMailboxes(
 	bucket: R2Bucket,
 ): Promise<{ id: string; email: string }[]> {
-	const list = await bucket.list({ prefix: "mailboxes/" });
-	return list.objects.map((obj) => {
+	const objects: R2Object[] = [];
+	let cursor: string | undefined;
+	let pageCount = 0;
+	const seenCursors = new Set<string>();
+
+	do {
+		if (cursor) {
+			if (seenCursors.has(cursor)) {
+				throw new Error("R2 mailbox listing returned a repeated cursor");
+			}
+			seenCursors.add(cursor);
+		}
+		if (pageCount >= MAILBOX_LIST_PAGE_LIMIT) {
+			throw new Error("R2 mailbox listing exceeded the page limit");
+		}
+		const list = await bucket.list({ prefix: "mailboxes/", cursor });
+		pageCount += 1;
+		objects.push(...list.objects);
+		if (list.truncated && !list.cursor) {
+			throw new Error("R2 mailbox listing was truncated without a cursor");
+		}
+		cursor = list.truncated ? list.cursor : undefined;
+	} while (cursor);
+
+	return objects.map((obj) => {
 		const id = obj.key.replace("mailboxes/", "").replace(".json", "");
 		return { id, email: id };
 	});

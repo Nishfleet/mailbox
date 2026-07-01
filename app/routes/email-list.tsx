@@ -228,6 +228,7 @@ export default function EmailListRoute() {
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
 			queryClient.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			queryClient.invalidateQueries({ queryKey: queryKeys.attention });
 		}
 	};
 
