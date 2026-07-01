@@ -43,6 +43,14 @@ const BUCKETS = [
 
 type AttentionBucketId = (typeof BUCKETS)[number]["id"];
 
+const ATTENTION_BUCKET_PRIORITY: Record<AttentionBucketId, number> = {
+	money: 0,
+	leads: 1,
+	act_now: 2,
+	aging: 3,
+	drafts_ready: 4,
+};
+
 export interface AttentionItem {
 	id: string;
 	mailboxId: string;
@@ -118,6 +126,12 @@ function mailboxBucketCount(
 
 function sortItemsByDateDesc(a: AttentionItem, b: AttentionItem) {
 	return new Date(b.date).getTime() - new Date(a.date).getTime();
+}
+
+function sortItemsByAttentionPriority(a: AttentionItem, b: AttentionItem) {
+	const priorityDelta =
+		ATTENTION_BUCKET_PRIORITY[a.bucket] - ATTENTION_BUCKET_PRIORITY[b.bucket];
+	return priorityDelta || sortItemsByDateDesc(a, b);
 }
 
 async function withTimeout<T>(
@@ -312,7 +326,7 @@ export async function buildAttentionSummary(env: Env) {
 
 	const allTopItems = mailboxes
 		.flatMap((mailbox) => mailbox.topItems)
-		.sort(sortItemsByDateDesc);
+		.sort(sortItemsByAttentionPriority);
 	const topItems = allTopItems.slice(0, SUMMARY_TOP_ITEMS_LIMIT);
 	const hasMoreTopItems =
 		allTopItems.length > topItems.length ||
@@ -320,7 +334,7 @@ export async function buildAttentionSummary(env: Env) {
 
 	return {
 		generatedAt: new Date().toISOString(),
-		triageVersion: "heuristic-v1",
+		triageVersion: "heuristic-v2",
 		mailboxCount: mailboxes.length,
 		mailboxDirectoryStatus,
 		unavailableMailboxCount: mailboxes.filter(

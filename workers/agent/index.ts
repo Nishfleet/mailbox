@@ -368,6 +368,10 @@ export class EmailAgent extends AIChatAgent<any> {
 		let threadContext = "";
 		try {
 			const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
+			if (email?.internal_owned) {
+				console.log(`Skipping auto-draft for internal owned-domain email ${emailData.emailId}.`);
+				return { status: "skipped_internal_owned_email" };
+			}
 			if (email?.body) {
 				const isInjection = await isPromptInjection(env.AI, email.body);
 				if (isInjection) {

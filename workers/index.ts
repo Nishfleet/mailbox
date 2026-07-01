@@ -14,6 +14,9 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
+	isOwnedInternalEmail,
+	hasTrustedInternalEmailHeader,
+	INTERNAL_EMAIL_HEADER,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
@@ -420,7 +423,11 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	return result;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+async function receiveEmail(
+	event: { raw: ReadableStream; rawSize: number; from?: string; to?: string },
+	env: Env,
+	ctx: ExecutionContext,
+) {
 	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
 	const parsedEmail = await new PostalMime().parse(rawEmail);
 
@@ -430,6 +437,15 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
 	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
+	const sender = (parsedEmail.from?.address || "").toLowerCase();
+	const envelopeSender = String(event.from || "").toLowerCase();
+	const envelopeRecipient = String(event.to || "").toLowerCase();
+	const isInternalOwnedNotification = isOwnedInternalEmail(env, sender, [
+		...allRecipients,
+		...ccRecipients,
+		...bccRecipients,
+	]) && isOwnedInternalEmail(env, envelopeSender, [envelopeRecipient])
+		&& hasTrustedInternalEmailHeader(env, parsedEmail.headers);
 
 	let mailboxId: string | undefined;
 	if (allowedAddresses.length > 0) {
@@ -466,21 +482,31 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	}
 
 	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
+	const storedHeaders = (parsedEmail.headers || []).filter(
+		(header) => String(header.key || "").trim().toLowerCase() !== INTERNAL_EMAIL_HEADER,
+	);
 
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
-		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
+		sender, recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
 		date: new Date().toISOString(), // uses receive time, not the email's Date header
+		read: isInternalOwnedNotification,
+		internal_owned: isInternalOwnedNotification,
 		body: parsedEmail.html || parsedEmail.text || "",
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
-		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
+		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(storedHeaders),
 	}, attachmentData);
+
+	if (isInternalOwnedNotification) {
+		console.log(`Stored internal owned-domain email for ${mailboxId} without auto-drafting.`);
+		return;
+	}
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
 		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
+		body: JSON.stringify({ mailboxId, emailId: messageId, sender, subject: parsedEmail.subject || "", threadId }),
 	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
 }
 

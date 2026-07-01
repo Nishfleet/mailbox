@@ -119,6 +119,7 @@ interface EmailData {
 	thread_id?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	internal_owned?: boolean;
 }
 
 interface AttachmentData {
@@ -665,19 +666,23 @@ export class MailboxDO extends DurableObject<Env> {
 	}
 
 	async getInboxUnreadCount() {
-		const row = this.db
-			.select({
-				unreadCount: sql<number>`COUNT(*)`.mapWith(Number),
-			})
-			.from(schema.emails)
-			.where(and(eq(schema.emails.folder_id, Folders.INBOX), eq(schema.emails.read, 0)))
-			.get();
+		const actionable = this.#actionableAttentionFilter("e");
+		const row = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as unreadCount
+				FROM emails e
+				WHERE e.folder_id = ? AND e.read = 0 AND ${actionable.sql}`,
+				Folders.INBOX,
+				...actionable.params,
+			),
+		][0] as { unreadCount: number } | undefined;
 		return row?.unreadCount ?? 0;
 	}
 
 	async getAttentionSummary() {
 		const agingThreshold = new Date(Date.now() - AGING_THRESHOLD_MS).toISOString();
 		const keywordThreshold = new Date(Date.now() - KEYWORD_ATTENTION_LOOKBACK_MS).toISOString();
+		const actionable = this.#actionableAttentionFilter("e");
 		const unresolvedThreadWhere = `NOT EXISTS (
 			SELECT 1 FROM emails d
 			WHERE d.folder_id = ?
@@ -689,9 +694,10 @@ export class MailboxDO extends DurableObject<Env> {
 				AND s.thread_id = COALESCE(e.thread_id, e.id)
 				AND s.date >= e.date
 		)`;
-		const moneyWhere = `e.folder_id = ? AND e.date >= ? AND (${categoryCondition(MONEY_TERMS)}) AND ${unresolvedThreadWhere}`;
-		const leadWhere = `e.folder_id = ? AND e.date >= ? AND (${categoryCondition(LEAD_TERMS)}) AND ${unresolvedThreadWhere}`;
-		const needsReplyWhere = `e.folder_id = ? AND e.read = 1 AND e.date <= ? AND NOT EXISTS (
+		const unreadWhere = `e.folder_id = ? AND e.read = 0 AND ${actionable.sql}`;
+		const moneyWhere = `e.folder_id = ? AND e.date >= ? AND ${actionable.sql} AND (${categoryCondition(MONEY_TERMS)}) AND ${unresolvedThreadWhere}`;
+		const leadWhere = `e.folder_id = ? AND e.date >= ? AND ${actionable.sql} AND (${categoryCondition(LEAD_TERMS)}) AND ${unresolvedThreadWhere}`;
+		const needsReplyWhere = `e.folder_id = ? AND e.read = 1 AND e.date <= ? AND ${actionable.sql} AND NOT EXISTS (
 			SELECT 1 FROM emails d
 			WHERE d.folder_id = ?
 				AND d.thread_id = COALESCE(e.thread_id, e.id)
@@ -702,57 +708,84 @@ export class MailboxDO extends DurableObject<Env> {
 				AND s.thread_id = COALESCE(e.thread_id, e.id)
 				AND s.date >= e.date
 		)`;
-		const agingWhere = "e.folder_id = ? AND e.read = 0 AND e.date <= ?";
+		const agingWhere = `e.folder_id = ? AND e.read = 0 AND e.date <= ? AND ${actionable.sql}`;
+		const draftWhere = `e.folder_id = ? AND ${actionable.sql}`;
 
 		const [
 			counts,
 			categories,
 			needsReplyCount,
 		] = await Promise.all([
-			this.#getAttentionCounts(agingThreshold),
-			this.#getAttentionCategoryCounts(keywordThreshold, unresolvedThreadWhere),
-			this.#countAttentionRows(needsReplyWhere, [Folders.INBOX, agingThreshold, Folders.DRAFT, Folders.SENT]),
+			this.#getAttentionCounts(agingThreshold, actionable),
+			this.#getAttentionCategoryCounts(keywordThreshold, unresolvedThreadWhere, actionable),
+			this.#countAttentionRows(needsReplyWhere, [
+				Folders.INBOX,
+				agingThreshold,
+				...actionable.params,
+				Folders.DRAFT,
+				Folders.SENT,
+			]),
 		]);
 
 		const topItems = [
 			...this.#getAttentionItems(
-				"e.folder_id = ? AND e.read = 0",
-				[Folders.INBOX],
+				unreadWhere,
+				[Folders.INBOX, ...actionable.params],
 				"act_now",
 				"Unread inbox message",
 				"high",
 			),
 			...this.#getAttentionItems(
 				needsReplyWhere,
-				[Folders.INBOX, agingThreshold, Folders.DRAFT, Folders.SENT],
+				[
+					Folders.INBOX,
+					agingThreshold,
+					...actionable.params,
+					Folders.DRAFT,
+					Folders.SENT,
+				],
 				"act_now",
 				"Read but no draft after 24 hours",
 				"medium",
 			),
 			...this.#getAttentionItems(
 				moneyWhere,
-				[Folders.INBOX, keywordThreshold, ...categoryParams(MONEY_TERMS), Folders.DRAFT, Folders.SENT],
+				[
+					Folders.INBOX,
+					keywordThreshold,
+					...actionable.params,
+					...categoryParams(MONEY_TERMS),
+					Folders.DRAFT,
+					Folders.SENT,
+				],
 				"money",
 				"Money keyword match",
 				"medium",
 			),
 			...this.#getAttentionItems(
 				leadWhere,
-				[Folders.INBOX, keywordThreshold, ...categoryParams(LEAD_TERMS), Folders.DRAFT, Folders.SENT],
+				[
+					Folders.INBOX,
+					keywordThreshold,
+					...actionable.params,
+					...categoryParams(LEAD_TERMS),
+					Folders.DRAFT,
+					Folders.SENT,
+				],
 				"leads",
 				"Lead keyword match",
 				"medium",
 			),
 			...this.#getAttentionItems(
 				agingWhere,
-				[Folders.INBOX, agingThreshold],
+				[Folders.INBOX, agingThreshold, ...actionable.params],
 				"aging",
 				"Unread for more than 24 hours",
 				"high",
 			),
 			...this.#getAttentionItems(
-				"e.folder_id = ?",
-				[Folders.DRAFT],
+				draftWhere,
+				[Folders.DRAFT, ...actionable.params],
 				"drafts_ready",
 				"Draft waiting for review",
 				"high",
@@ -784,7 +817,10 @@ export class MailboxDO extends DurableObject<Env> {
 		};
 	}
 
-	#getAttentionCounts(agingThreshold: string) {
+	#getAttentionCounts(
+		agingThreshold: string,
+		actionable: { sql: string; params: string[] },
+	) {
 		const row = [
 			...this.ctx.storage.sql.exec(
 				`SELECT
@@ -795,7 +831,7 @@ export class MailboxDO extends DurableObject<Env> {
 					MAX(CASE WHEN e.folder_id = ? THEN e.date END) as lastInboundAt,
 					MAX(CASE WHEN e.folder_id = ? THEN e.date END) as newestDraftAt
 				FROM emails e
-				WHERE e.folder_id IN (?, ?)`,
+				WHERE e.folder_id IN (?, ?) AND ${actionable.sql}`,
 				Folders.INBOX,
 				Folders.DRAFT,
 				Folders.INBOX,
@@ -805,6 +841,7 @@ export class MailboxDO extends DurableObject<Env> {
 				Folders.DRAFT,
 				Folders.INBOX,
 				Folders.DRAFT,
+				...actionable.params,
 			),
 		][0] as unknown as AttentionCountRow | undefined;
 
@@ -818,18 +855,23 @@ export class MailboxDO extends DurableObject<Env> {
 		};
 	}
 
-	#getAttentionCategoryCounts(keywordThreshold: string, unresolvedThreadWhere: string) {
+	#getAttentionCategoryCounts(
+		keywordThreshold: string,
+		unresolvedThreadWhere: string,
+		actionable: { sql: string; params: string[] },
+	) {
 		const row = [
 			...this.ctx.storage.sql.exec(
 				`SELECT
 					SUM(CASE WHEN ${categoryCondition(MONEY_TERMS)} THEN 1 ELSE 0 END) as moneyCount,
 					SUM(CASE WHEN ${categoryCondition(LEAD_TERMS)} THEN 1 ELSE 0 END) as leadCount
 				FROM emails e
-				WHERE e.folder_id = ? AND e.date >= ? AND ${unresolvedThreadWhere}`,
+				WHERE e.folder_id = ? AND e.date >= ? AND ${actionable.sql} AND ${unresolvedThreadWhere}`,
 				...categoryParams(MONEY_TERMS),
 				...categoryParams(LEAD_TERMS),
 				Folders.INBOX,
 				keywordThreshold,
+				...actionable.params,
 				Folders.DRAFT,
 				Folders.SENT,
 			),
@@ -839,6 +881,10 @@ export class MailboxDO extends DurableObject<Env> {
 			moneyCount: row?.moneyCount ?? 0,
 			leadCount: row?.leadCount ?? 0,
 		};
+	}
+
+	#actionableAttentionFilter(alias: string) {
+		return { sql: `COALESCE(${alias}.internal_owned, 0) = 0`, params: [] };
 	}
 
 	#countAttentionRows(where: string, params: (string | number)[]) {
@@ -1180,6 +1226,7 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: email.thread_id ?? null,
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
+				internal_owned: email.internal_owned ? 1 : 0,
 			})
 			.run();
 

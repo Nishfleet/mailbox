@@ -28,6 +28,7 @@ export interface EmailMetadata {
 	email_references?: string | null;
 	thread_id?: string | null;
 	folder_id?: string | null;
+	internal_owned?: boolean | number | null;
 	snippet?: string | null;
 }
 

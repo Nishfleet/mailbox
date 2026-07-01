@@ -15,6 +15,70 @@ import type { Env } from "../types";
 import { formatQuotedDate } from "../../shared/dates";
 
 const MAILBOX_LIST_PAGE_LIMIT = 100;
+export const INTERNAL_EMAIL_HEADER = "x-nish-internal-email";
+
+function normalizeDomain(domain: string) {
+	return domain.toLowerCase().trim().replace(/^@+/, "");
+}
+
+function domainFromAddress(address: string) {
+	const match = address.toLowerCase().match(/@([a-z0-9.-]+\.[a-z]{2,})\b/i);
+	return match ? normalizeDomain(match[1]) : null;
+}
+
+export function getOwnedEmailDomains(env: Env) {
+	const domains = new Set<string>();
+	const domainsRaw = env.DOMAINS || "";
+	for (const domain of domainsRaw.split(",")) {
+		const normalized = normalizeDomain(domain);
+		if (normalized) domains.add(normalized);
+	}
+	const addresses = Array.isArray(env.EMAIL_ADDRESSES) ? env.EMAIL_ADDRESSES : [];
+	for (const address of addresses) {
+		const domain = domainFromAddress(address);
+		if (domain) domains.add(domain);
+	}
+	return [...domains].sort((a, b) => a.localeCompare(b));
+}
+
+export function isOwnedEmailAddress(env: Env, address: string) {
+	const domain = domainFromAddress(address);
+	if (!domain) return false;
+	return getOwnedEmailDomains(env).includes(domain);
+}
+
+export function isOwnedInternalEmail(
+	env: Env,
+	sender: string,
+	recipients: string[],
+) {
+	return (
+		isOwnedEmailAddress(env, sender) &&
+		recipients.some((recipient) => isOwnedEmailAddress(env, recipient))
+	);
+}
+
+function timingSafeStringEqual(left: string, right: string) {
+	if (left.length !== right.length) return false;
+	let diff = 0;
+	for (let index = 0; index < left.length; index += 1) {
+		diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+	}
+	return diff === 0;
+}
+
+export function hasTrustedInternalEmailHeader(
+	env: Env,
+	headers: Array<{ key?: string | null; value?: string | null }> | undefined,
+) {
+	const token = String(env.INTERNAL_EMAIL_TOKEN || "").trim();
+	if (!token || !headers?.length) return false;
+	return headers.some((header) => {
+		const key = String(header.key || "").trim().toLowerCase();
+		const value = String(header.value || "").trim();
+		return key === INTERNAL_EMAIL_HEADER && timingSafeStringEqual(value, token);
+	});
+}
 
 // ── DO Stub ────────────────────────────────────────────────────────
 

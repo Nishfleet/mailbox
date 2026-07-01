@@ -29,6 +29,7 @@ export const emails = sqliteTable("emails", {
 	thread_id: text("thread_id"),
 	message_id: text("message_id"),
 	raw_headers: text("raw_headers"),
+	internal_owned: integer("internal_owned").default(0),
 });
 
 export const attachments = sqliteTable("attachments", {
