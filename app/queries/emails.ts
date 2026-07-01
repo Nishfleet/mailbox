@@ -93,7 +93,7 @@ export function useThreadReplies(
 
 // ---------- Mutations ----------
 
-/** Invalidate both the email list and folder counts after any email mutation. */
+/** Invalidate mailbox-derived views after any email mutation. */
 function useInvalidateEmailData() {
 	const qc = useQueryClient();
 	return (mailboxId: string) => {
@@ -101,6 +101,7 @@ function useInvalidateEmailData() {
 		qc.invalidateQueries({
 			queryKey: queryKeys.folders.list(mailboxId),
 		});
+		qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
 	};
 }
 
@@ -183,6 +184,7 @@ export function useUpdateEmail() {
 			qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
+			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
 		},
 	});
 }
@@ -200,6 +202,7 @@ export function useMarkThreadRead() {
 			qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
+			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
 		},
 	});
 }

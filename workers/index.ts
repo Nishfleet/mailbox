@@ -42,6 +42,8 @@ const DraftBody = z.object({
 	draft_id: z.string().optional(),
 });
 
+const MAILBOX_COUNT_TIMEOUT_MS = 5000;
+
 // -- Helpers --------------------------------------------------------
 
 function slugify(text: string) { // can return "" for non-alphanumeric input
@@ -61,6 +63,36 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	const v = c.req.query(key);
 	if (v === undefined || v === "") return undefined;
 	return v === "true" || v === "1";
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void): Promise<T | null> {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<null>((resolve) => {
+		timeoutId = setTimeout(() => {
+			onTimeout();
+			resolve(null);
+		}, timeoutMs);
+	});
+
+	try {
+		return await Promise.race([promise, timeout]);
+	} finally {
+		if (timeoutId !== undefined) clearTimeout(timeoutId);
+	}
+}
+
+async function getInboxUnreadCount(env: Env, mailboxId: string): Promise<number | null> {
+	try {
+		const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+		return await withTimeout(
+			stub.getInboxUnreadCount(),
+			MAILBOX_COUNT_TIMEOUT_MS,
+			() => console.warn(`Timed out loading unread inbox count for ${mailboxId}`),
+		);
+	} catch (error) {
+		console.error(`Failed to load unread inbox count for ${mailboxId}`, error);
+		return null;
+	}
 }
 
 // -- App & middleware -----------------------------------------------
@@ -96,7 +128,14 @@ app.get("/api/v1/config", (c) => {
 
 app.get("/api/v1/mailboxes", async (c) => {
 	const allMailboxes = await listMailboxes(c.env.BUCKET);
-	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
+	const mailboxes = await Promise.all(
+		allMailboxes.map(async (m) => ({
+			...m,
+			name: m.id,
+			unreadInboxCount: await getInboxUnreadCount(c.env, m.id),
+		})),
+	);
+	return c.json(mailboxes);
 });
 
 app.post("/api/v1/mailboxes", async (c) => {

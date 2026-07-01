@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import {
+	Badge,
 	Button,
 	Dialog,
 	Empty,
@@ -26,6 +27,38 @@ import { queryKeys } from "~/queries/keys";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
+}
+
+function MailboxPendingStatus({ count }: { count?: number | null }) {
+	if (count === undefined) {
+		return (
+			<span className="whitespace-nowrap text-xs font-medium text-kumo-subtle">
+				Checking...
+			</span>
+		);
+	}
+
+	if (count === null) {
+		return (
+			<span className="whitespace-nowrap text-xs font-medium text-kumo-subtle">
+				Unavailable
+			</span>
+		);
+	}
+
+	if (count > 0) {
+		return (
+			<Badge variant="secondary">
+				{count === 1 ? "1 pending" : `${count} pending`}
+			</Badge>
+		);
+	}
+
+	return (
+		<span className="whitespace-nowrap text-xs font-medium text-kumo-subtle">
+			No pending
+		</span>
+	);
 }
 
 export default function HomeRoute() {
@@ -130,11 +163,21 @@ export default function HomeRoute() {
 
 	const isConfigured = emailAddresses.length > 0;
 	const accounts = isConfigured
-		? emailAddresses.map((addr) => ({
-				id: addr,
-				email: addr,
-				name: addr.split("@")[0] || addr,
-			}))
+		? emailAddresses.map((addr) => {
+				const existingMailbox = mailboxes.find(
+					(mailbox) => mailbox.email.toLowerCase() === addr.toLowerCase(),
+				);
+				return {
+					id: addr,
+					email: addr,
+					name: addr.split("@")[0] || addr,
+					unreadInboxCount: mailboxesFetched
+						? existingMailbox
+							? existingMailbox.unreadInboxCount ?? null
+							: 0
+						: undefined,
+				};
+			})
 		: mailboxes;
 
 	const isLoading = !configData;
@@ -183,9 +226,15 @@ export default function HomeRoute() {
 									<div className="text-sm font-medium text-kumo-default truncate">
 										{account.name}
 									</div>
-									<div className="text-sm text-kumo-subtle">
+									<div className="truncate text-sm text-kumo-subtle">
 										{account.email}
 									</div>
+									<div className="mt-1 flex sm:hidden">
+										<MailboxPendingStatus count={account.unreadInboxCount} />
+									</div>
+								</div>
+								<div className="hidden min-w-24 shrink-0 justify-end sm:flex">
+									<MailboxPendingStatus count={account.unreadInboxCount} />
 								</div>
 								{!isConfigured && (
 									<Button

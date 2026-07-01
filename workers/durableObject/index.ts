@@ -586,6 +586,17 @@ export class MailboxDO extends DurableObject<Env> {
 		return result;
 	}
 
+	async getInboxUnreadCount() {
+		const row = this.db
+			.select({
+				unreadCount: sql<number>`COUNT(*)`.mapWith(Number),
+			})
+			.from(schema.emails)
+			.where(and(eq(schema.emails.folder_id, Folders.INBOX), eq(schema.emails.read, 0)))
+			.get();
+		return row?.unreadCount ?? 0;
+	}
+
 	async createFolder(id: string, name: string, is_deletable: number = 1) {
 		try {
 			const result = this.db
