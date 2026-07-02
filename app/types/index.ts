@@ -46,6 +46,19 @@ export interface AttentionItem {
 	confidence: "high" | "medium";
 }
 
+export interface AttentionNextAction {
+	id: string;
+	bucket: AttentionBucketId;
+	label: string;
+	description: string;
+	mailboxId: string;
+	folderId: string;
+	emailId: string;
+	threadId?: string | null;
+	subject: string;
+	reason: string;
+}
+
 export interface AttentionBucket {
 	id: AttentionBucketId;
 	label: string;
@@ -87,6 +100,7 @@ export interface AttentionSummary {
 	buckets: AttentionBucket[];
 	mailboxes: MailboxAttentionSummary[];
 	topItems: AttentionItem[];
+	nextActions: AttentionNextAction[];
 	topItemsLimit: number;
 	topItemsSampled: boolean;
 	hasMoreTopItems: boolean;

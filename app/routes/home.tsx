@@ -37,7 +37,12 @@ import {
 	useMailboxes,
 } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
-import type { AttentionBucket, AttentionBucketId, AttentionItem } from "~/types";
+import type {
+	AttentionBucket,
+	AttentionBucketId,
+	AttentionItem,
+	AttentionNextAction,
+} from "~/types";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
@@ -162,6 +167,42 @@ function AttentionItemRow({ item }: { item: AttentionItem }) {
 	);
 }
 
+function attentionActionHref(action: AttentionNextAction) {
+	const params = new URLSearchParams({ email: action.emailId });
+	if (action.threadId) params.set("thread", action.threadId);
+	return `/mailbox/${action.mailboxId}/emails/${action.folderId}?${params}`;
+}
+
+function AttentionNextActionRow({ action }: { action: AttentionNextAction }) {
+	return (
+		<RouterLink
+			to={attentionActionHref(action)}
+			className="flex min-h-16 items-center gap-3 px-4 py-3 no-underline transition-colors hover:bg-kumo-tint"
+		>
+			<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
+				{BUCKET_ICONS[action.bucket]}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center gap-2">
+					<span className="truncate text-sm font-semibold text-kumo-default">
+						{action.label}
+					</span>
+					<span className="shrink-0 text-xs text-kumo-subtle">
+						{action.mailboxId}
+					</span>
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{action.description}
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{action.subject} · {action.reason}
+				</div>
+			</div>
+			<ArrowRightIcon size={16} className="shrink-0 text-kumo-subtle" />
+		</RouterLink>
+	);
+}
+
 function AttentionDesk() {
 	const {
 		data: attention,
@@ -249,6 +290,21 @@ function AttentionDesk() {
 					<AttentionBucketRow key={bucket.id} bucket={bucket} />
 				))}
 			</div>
+
+			{attention.nextActions.length > 0 && (
+				<div className="border-t border-kumo-line">
+					<div className="px-5 py-3">
+						<div className="text-xs font-semibold uppercase text-kumo-subtle">
+							Next workflow
+						</div>
+					</div>
+					<div className="divide-y divide-kumo-line">
+						{attention.nextActions.map((action) => (
+							<AttentionNextActionRow key={action.id} action={action} />
+						))}
+					</div>
+				</div>
+			)}
 
 			{attention.topItems.length > 0 && (
 				<div className="border-t border-kumo-line px-2 py-2">
