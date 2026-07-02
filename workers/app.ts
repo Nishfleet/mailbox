@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
+import { runAttentionNotificationCheck } from "./lib/attention-notifications";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
 
@@ -110,6 +111,20 @@ app.all("*", (c) => {
 // Export the Hono app as the default export with an email handler
 export default {
 	fetch: app.fetch,
+	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(
+			runAttentionNotificationCheck(env, {
+				now: new Date(controller.scheduledTime),
+				cron: controller.cron,
+			})
+				.then((result) => {
+					console.log("Attention notification check finished", result);
+				})
+				.catch((error) => {
+					console.error("Attention notification check failed", error);
+				}),
+		);
+	},
 	async email(
 		event: { raw: ReadableStream; rawSize: number; from?: string; to?: string },
 		env: Env,
