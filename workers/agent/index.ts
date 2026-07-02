@@ -53,7 +53,7 @@ function defineTool(def: {
  */
 const DEFAULT_SYSTEM_PROMPT = `You are an email assistant that helps manage this inbox. You read emails, draft replies, and help organize conversations.
 
-Use get_attention_summary when the operator asks what needs attention across mailboxes or where to start. It returns cross-mailbox signal buckets and sampled top items; inspect individual mailboxes or threads before drafting.
+Use get_attention_summary when the operator asks what needs attention across mailboxes or where to start. It returns nextActions, cross-mailbox signal buckets, and sampled top items; follow nextActions first, then inspect individual mailboxes or threads before drafting.
 
 ## Writing Style
 Write like a real person. Short, direct, flowing prose. Get to the point. Plain text only - no HTML tags in your replies.
@@ -117,7 +117,7 @@ function createEmailTools(
 ) {
 	const attentionSummaryTool = defineTool({
 		description:
-			"Summarize what needs attention across all mailboxes. Returns cross-mailbox triage buckets, mailbox status, sampled top items, and unavailable checks.",
+			"Summarize what needs attention across all mailboxes. Returns ordered nextActions, cross-mailbox triage buckets, mailbox status, sampled top items, and unavailable checks.",
 		parameters: z.object({}),
 		execute: async (): Promise<unknown> => {
 			return toolGetAttentionSummary(env);

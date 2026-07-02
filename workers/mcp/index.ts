@@ -97,7 +97,7 @@ export class EmailMCP extends McpAgent<Env> {
 		// ── get_attention_summary ─────────────────────────────────
 		this.server.tool(
 			"get_attention_summary",
-			"Summarize what needs attention across all mailboxes. Returns triage buckets, mailbox status, top items, and unavailable checks. Use this before opening individual inboxes.",
+			"Summarize what needs attention across all mailboxes. Returns ordered nextActions, triage buckets, mailbox status, top items, and unavailable checks. Use this before opening individual inboxes.",
 			{},
 			async () => {
 				const result = await toolGetAttentionSummary(env);

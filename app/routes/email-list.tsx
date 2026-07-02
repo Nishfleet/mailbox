@@ -18,7 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
@@ -145,6 +145,9 @@ export default function EmailListRoute() {
 		mailboxId: string;
 		folder: string;
 	}>();
+	const [searchParams] = useSearchParams();
+	const requestedEmailId = searchParams.get("email");
+	const requestedThreadId = searchParams.get("thread");
 	const {
 		selectedEmailId,
 		isComposing,
@@ -188,16 +191,58 @@ export default function EmailListRoute() {
 
 	// Track folder identity to detect folder changes vs page changes
 	const prevFolderRef = useRef<string | undefined>(undefined);
+	const consumedEmailLinkRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		const folderChanged = prevFolderRef.current !== `${mailboxId}/${folder}`;
-		prevFolderRef.current = `${mailboxId}/${folder}`;
+		const folderKey = `${mailboxId}/${folder}`;
+		const folderChanged = prevFolderRef.current !== folderKey;
+		const emailLinkKey = requestedEmailId
+			? `${folderKey}/${requestedEmailId}`
+			: null;
+		prevFolderRef.current = folderKey;
 
 		if (folderChanged) {
-			closePanel();
 			setPage(1);
+			if (!requestedEmailId) {
+				consumedEmailLinkRef.current = null;
+				closePanel();
+				return;
+			}
 		}
-	}, [mailboxId, folder, closePanel]);
+
+		if (requestedEmailId && consumedEmailLinkRef.current !== emailLinkKey) {
+			consumedEmailLinkRef.current = emailLinkKey;
+			selectEmail(requestedEmailId);
+			if (mailboxId && folder !== Folders.DRAFT) {
+				if (requestedThreadId) {
+					markThreadRead.mutate({
+						mailboxId,
+						threadId: requestedThreadId,
+					});
+				} else {
+					updateEmail.mutate({
+						mailboxId,
+						id: requestedEmailId,
+						data: { read: true },
+					});
+				}
+			}
+			return;
+		}
+
+		if (!requestedEmailId) {
+			consumedEmailLinkRef.current = null;
+		}
+	}, [
+		mailboxId,
+		folder,
+		requestedEmailId,
+		requestedThreadId,
+		closePanel,
+		selectEmail,
+		markThreadRead,
+		updateEmail,
+	]);
 
 	const toggleStar = (e: React.MouseEvent, email: Email) => {
 		e.preventDefault();
