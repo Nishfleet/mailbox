@@ -98,5 +98,34 @@
       "emailId": "email-lead",
       "threadId": "thread-lead"
     }
+  ],
+  "expectedAgentDesks": [
+    {
+      "id": "money_agent",
+      "label": "Money agent",
+      "signalCount": 3,
+      "mailboxIds": ["billing@0509.io"],
+      "nextActionIds": [
+        "billing@0509.io:thread-draft",
+        "billing@0509.io:thread-money"
+      ]
+    },
+    {
+      "id": "lead_agent",
+      "label": "Lead agent",
+      "signalCount": 1,
+      "mailboxIds": ["hello@siterep.net"],
+      "nextActionIds": ["hello@siterep.net:thread-lead"]
+    },
+    {
+      "id": "support_agent",
+      "label": "Support agent",
+      "signalCount": 2,
+      "mailboxIds": ["billing@0509.io", "support@seofixkit.com"],
+      "nextActionIds": [
+        "billing@0509.io:thread-money",
+        "support@seofixkit.com:thread-aging"
+      ]
+    }
   ]
 }
