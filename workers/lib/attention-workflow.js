@@ -93,6 +93,7 @@ export function buildAttentionNextActions(items, limit = 3) {
 			folderId: item.folderId,
 			emailId: item.emailId,
 			threadId: item.threadId,
+			latestAt: item.date,
 			subject: item.subject,
 			reason: item.reason,
 		});

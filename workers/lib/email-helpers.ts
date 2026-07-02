@@ -58,6 +58,28 @@ export function isOwnedInternalEmail(
 	);
 }
 
+type RecipientInput = string | string[] | undefined | null;
+
+function normalizeRecipientInput(input: RecipientInput) {
+	if (!input) return [];
+	return (Array.isArray(input) ? input : [input])
+		.flatMap((value) => value.split(","))
+		.map((value) => value.trim().toLowerCase())
+		.filter(Boolean);
+}
+
+export function isOwnedDomainDelivery(
+	env: Env,
+	sender: string,
+	...recipientFields: RecipientInput[]
+) {
+	const recipients = recipientFields.flatMap(normalizeRecipientInput);
+	return isOwnedInternalEmail(env, sender, recipients);
+}
+
+export const OWNED_DOMAIN_DELIVERY_ERROR =
+	"Owned-domain recipients are internal; do not send them through email.";
+
 function timingSafeStringEqual(left: string, right: string) {
 	if (left.length !== right.length) return false;
 	let diff = 0;

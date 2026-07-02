@@ -25,6 +25,8 @@ import {
 	generateMessageId,
 	buildReferencesChain,
 	buildThreadingHeaders,
+	isOwnedDomainDelivery,
+	OWNED_DOMAIN_DELIVERY_ERROR,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
 import { sendEmail } from "../email-sender";
@@ -138,6 +140,10 @@ export async function toolDraftReply(
 	| { status: "draft_saved"; draftId: string; message: string; draft: Record<string, string> }
 	| { error: string }
 > {
+	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
+	}
+
 	const stub = getMailboxStub(env, mailboxId);
 
 	// Verify/sanitize if requested
@@ -220,6 +226,10 @@ export async function toolDraftEmail(
 	| { status: string; draftId: string; threadId?: string; message: string; draft?: Record<string, string> }
 	| { error: string }
 > {
+	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
+	}
+
 	const stub = getMailboxStub(env, mailboxId);
 
 	let processedBody = params.body.trim();
@@ -296,6 +306,9 @@ export async function toolUpdateDraft(
 	const oldDraft = (await stub.getEmail(params.draftId)) as EmailFull | null;
 	if (!oldDraft) {
 		return { error: "Draft not found" };
+	}
+	if (isOwnedDomainDelivery(env, mailboxId, params.to ?? oldDraft.recipient)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
 	}
 
 	// Verify the body BEFORE deleting the old draft to prevent data loss
@@ -410,6 +423,10 @@ export async function toolSendReply(
 	| { status: "sent"; messageId: string; message: string }
 	| { error: string }
 > {
+	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
+	}
+
 	const stub = getMailboxStub(env, mailboxId);
 
 	// Check send rate limit
@@ -488,6 +505,10 @@ export async function toolSendEmail(
 	| { status: "sent"; messageId: string; message: string }
 	| { error: string }
 > {
+	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
+	}
+
 	const stub = getMailboxStub(env, mailboxId);
 
 	// Check send rate limit

@@ -72,8 +72,40 @@ const expiredDecision = shouldSendAttentionNotification(summary, {
 	cooldownMinutes: 60,
 	maxActions: 3,
 });
-assert.equal(expiredDecision.shouldSend, true);
-assert.equal(expiredDecision.reason, "cooldown-expired");
+assert.equal(expiredDecision.shouldSend, false);
+assert.equal(expiredDecision.reason, "unchanged");
+
+const changedDecision = shouldSendAttentionNotification({
+	...summary,
+	attentionSignalCount: summary.attentionSignalCount + 1,
+}, {
+	lastSentAt: now.toISOString(),
+	lastFingerprint: notification.fingerprint,
+}, {
+	now: new Date("2026-07-02T05:05:00.000Z"),
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(changedDecision.shouldSend, true);
+assert.equal(changedDecision.reason, "changed");
+
+const fresherDecision = shouldSendAttentionNotification({
+	...summary,
+	nextActions: summary.nextActions.map((action, index) =>
+		index === 0 ? { ...action, latestAt: "2026-07-02T05:04:00.000Z" } : action,
+	),
+}, {
+	lastSentAt: now.toISOString(),
+	lastFingerprint: notification.fingerprint,
+}, {
+	now: new Date("2026-07-02T05:05:00.000Z"),
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(fresherDecision.shouldSend, true);
+assert.equal(fresherDecision.reason, "changed");
 
 const quietDecision = shouldSendAttentionNotification({
 	...summary,
@@ -97,5 +129,7 @@ console.log(
 		firstDecision: firstDecision.reason,
 		repeatedDecision: repeatedDecision.reason,
 		expiredDecision: expiredDecision.reason,
+		changedDecision: changedDecision.reason,
+		fresherDecision: fresherDecision.reason,
 	}),
 );

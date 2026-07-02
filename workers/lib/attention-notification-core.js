@@ -56,6 +56,7 @@ function actionFingerprint(action) {
 		action.bucket,
 		action.mailboxId,
 		action.threadId || action.emailId,
+		action.latestAt,
 		action.subject,
 	]
 		.map(normalizeText)
@@ -148,10 +149,10 @@ export function shouldSendAttentionNotification(summary, state = {}, options = {
 	const isInsideCooldown =
 		Number.isFinite(lastSentAt) && now.getTime() - lastSentAt < cooldownMs;
 
-	if (isSameFingerprint && isInsideCooldown) {
+	if (isSameFingerprint) {
 		return {
 			shouldSend: false,
-			reason: "unchanged-cooldown",
+			reason: isInsideCooldown ? "unchanged-cooldown" : "unchanged",
 			notification,
 			signalCount,
 		};
@@ -159,7 +160,7 @@ export function shouldSendAttentionNotification(summary, state = {}, options = {
 
 	return {
 		shouldSend: true,
-		reason: isSameFingerprint ? "cooldown-expired" : "changed",
+		reason: "changed",
 		notification,
 		signalCount,
 	};

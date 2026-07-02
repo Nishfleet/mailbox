@@ -79,6 +79,7 @@ export interface AttentionNextAction {
 	folderId: string;
 	emailId: string;
 	threadId?: string | null;
+	latestAt?: string | null;
 	subject: string;
 	reason: string;
 }

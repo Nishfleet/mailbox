@@ -13,6 +13,8 @@ import {
 	buildReferencesChain,
 	buildThreadingHeaders,
 	resolveOriginalEmail,
+	isOwnedDomainDelivery,
+	OWNED_DOMAIN_DELIVERY_ERROR,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
@@ -43,6 +45,9 @@ export async function handleReplyEmail(c: AppContext) {
 	} catch (e) {
 		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
 		throw e;
+	}
+	if (isOwnedDomainDelivery(c.env, fromEmail, to, cc, bcc)) {
+		return c.json({ error: OWNED_DOMAIN_DELIVERY_ERROR }, 400);
 	}
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
@@ -133,6 +138,9 @@ export async function handleForwardEmail(c: AppContext) {
 	} catch (e) {
 		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
 		throw e;
+	}
+	if (isOwnedDomainDelivery(c.env, fromEmail, to, cc, bcc)) {
+		return c.json({ error: OWNED_DOMAIN_DELIVERY_ERROR }, 400);
 	}
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);

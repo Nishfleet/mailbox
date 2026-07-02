@@ -17,6 +17,8 @@ import {
 	isOwnedInternalEmail,
 	hasTrustedInternalEmailHeader,
 	INTERNAL_EMAIL_HEADER,
+	isOwnedDomainDelivery,
+	OWNED_DOMAIN_DELIVERY_ERROR,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
@@ -255,6 +257,9 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
 		throw e;
 	}
+	if (isOwnedDomainDelivery(c.env, fromEmail, to, cc, bcc)) {
+		return c.json({ error: OWNED_DOMAIN_DELIVERY_ERROR }, 400);
+	}
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 	const stub = c.var.mailboxStub;
@@ -292,6 +297,9 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const { to, cc, bcc, subject, body, in_reply_to, thread_id, draft_id } = DraftBody.parse(await c.req.json());
+	if (isOwnedDomainDelivery(c.env, mailboxId, to, cc, bcc)) {
+		return c.json({ error: OWNED_DOMAIN_DELIVERY_ERROR }, 400);
+	}
 	const stub = c.var.mailboxStub;
 	if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
 	const messageId = crypto.randomUUID();
