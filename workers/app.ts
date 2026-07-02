@@ -126,7 +126,7 @@ export default {
 		);
 	},
 	async email(
-		event: { raw: ReadableStream; rawSize: number; from?: string; to?: string },
+		event: { raw: ReadableStream; rawSize: number; from?: string; to?: string; headers?: Headers },
 		env: Env,
 		ctx: ExecutionContext,
 	) {

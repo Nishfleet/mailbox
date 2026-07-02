@@ -10,6 +10,10 @@ import {
 	shouldSendAttentionNotification,
 } from "../workers/lib/attention-notification-core.js";
 import { buildAttentionNextActions } from "../workers/lib/attention-workflow.js";
+import {
+	isHighConfidenceSpam,
+	parseCloudflareSpamScore,
+} from "../workers/lib/spam.js";
 
 const trace = JSON.parse(
 	readFileSync(new URL("../docs/evals/attention-workflow-trace.json", import.meta.url), "utf8"),
@@ -219,6 +223,38 @@ const actNowDecision = shouldSendAttentionNotification({
 assert.equal(actNowDecision.shouldSend, true);
 assert.equal(actNowDecision.reason, "changed");
 
+const companyBillingDecision = shouldSendAttentionNotification({
+	...summary,
+	attentionSignalCount: 1,
+	nextActions: [],
+	notificationActions: [{
+		id: "billing@0509.io:thread-company-billing",
+		bucket: "money",
+		label: "Handle money",
+		mailboxId: "billing@0509.io",
+		emailId: "email-company-billing",
+		threadId: "thread-company-billing",
+		latestAt: "2026-07-02T05:04:00.000Z",
+		subject: "Stripe invoice requires action",
+	}],
+}, {}, {
+	now,
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(companyBillingDecision.shouldSend, true);
+assert.equal(companyBillingDecision.reason, "changed");
+
+const spamHeaders = [{ key: "X-Cf-Spamh-Score", value: "5" }];
+const runtimeSpamHeaders = new Headers({ "X-Cf-Spamh-Score": "5" });
+const normalHeaders = [{ key: "X-Cf-Spamh-Score", value: "4.9" }];
+assert.equal(parseCloudflareSpamScore(spamHeaders), 5);
+assert.equal(isHighConfidenceSpam(spamHeaders), true);
+assert.equal(isHighConfidenceSpam(runtimeSpamHeaders), true);
+assert.equal(isHighConfidenceSpam(normalHeaders), false);
+assert.equal(isHighConfidenceSpam([{ key: "Subject", value: "Invoice attached" }]), false);
+
 console.log(
 	JSON.stringify({
 		ok: true,
@@ -233,5 +269,6 @@ console.log(
 		draftOnlyDecision: draftOnlyDecision.reason,
 		draftCrowdedDecision: draftCrowdedDecision.reason,
 		actNowDecision: actNowDecision.reason,
+		companyBillingDecision: companyBillingDecision.reason,
 	}),
 );

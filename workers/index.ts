@@ -21,6 +21,7 @@ import {
 	OWNED_DOMAIN_DELIVERY_ERROR,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
+import { isHighConfidenceSpam } from "./lib/spam.js";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
@@ -432,7 +433,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 }
 
 async function receiveEmail(
-	event: { raw: ReadableStream; rawSize: number; from?: string; to?: string },
+	event: { raw: ReadableStream; rawSize: number; from?: string; to?: string; headers?: Headers },
 	env: Env,
 	ctx: ExecutionContext,
 ) {
@@ -454,6 +455,7 @@ async function receiveEmail(
 		...bccRecipients,
 	]) && isOwnedInternalEmail(env, envelopeSender, [envelopeRecipient])
 		&& hasTrustedInternalEmailHeader(env, parsedEmail.headers);
+	const isSpam = !isInternalOwnedNotification && isHighConfidenceSpam(event.headers);
 
 	let mailboxId: string | undefined;
 	if (allowedAddresses.length > 0) {
@@ -494,12 +496,12 @@ async function receiveEmail(
 		(header) => String(header.key || "").trim().toLowerCase() !== INTERNAL_EMAIL_HEADER,
 	);
 
-	await stub.createEmail(Folders.INBOX, {
+	await stub.createEmail(isSpam ? Folders.SPAM : Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
 		sender, recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
 		date: new Date().toISOString(), // uses receive time, not the email's Date header
-		read: isInternalOwnedNotification,
+		read: isInternalOwnedNotification || isSpam,
 		internal_owned: isInternalOwnedNotification,
 		body: parsedEmail.html || parsedEmail.text || "",
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
@@ -508,6 +510,10 @@ async function receiveEmail(
 
 	if (isInternalOwnedNotification) {
 		console.log(`Stored internal owned-domain email for ${mailboxId} without auto-drafting.`);
+		return;
+	}
+	if (isSpam) {
+		console.log(`Stored high-confidence spam email for ${mailboxId} without auto-drafting.`);
 		return;
 	}
 
