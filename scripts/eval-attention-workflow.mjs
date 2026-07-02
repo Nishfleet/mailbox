@@ -4,7 +4,10 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildAttentionNextActions } from "../workers/lib/attention-workflow.js";
+import {
+	buildAgentDeskSummaries,
+	buildAttentionNextActions,
+} from "../workers/lib/attention-workflow.js";
 
 const trace = JSON.parse(
 	readFileSync(new URL("../docs/evals/attention-workflow-trace.json", import.meta.url), "utf8"),
@@ -27,10 +30,23 @@ assert.equal(
 );
 assert.equal(actions.some((action) => action.bucket === "act_now" && action.threadId === "thread-money"), false);
 
+const desks = buildAgentDeskSummaries(trace.input);
+const comparableDesks = desks.map((desk) => ({
+	id: desk.id,
+	label: desk.label,
+	signalCount: desk.signalCount,
+	mailboxIds: desk.mailboxIds,
+	nextActionIds: desk.nextActions.map((action) => action.id),
+}));
+
+assert.deepEqual(comparableDesks, trace.expectedAgentDesks);
+assert.equal(desks.every((desk) => desk.nextActions.length > 0), true);
+
 console.log(
 	JSON.stringify({
 		ok: true,
 		checked: trace.name,
 		nextActions: comparable,
+		agentDesks: comparableDesks,
 	}),
 );

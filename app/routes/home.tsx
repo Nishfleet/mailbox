@@ -38,6 +38,7 @@ import {
 } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
 import type {
+	AgentDeskSummary,
 	AttentionBucket,
 	AttentionBucketId,
 	AttentionItem,
@@ -94,6 +95,13 @@ const BUCKET_FOLDER: Record<AttentionBucketId, string> = {
 	leads: "inbox",
 	aging: "inbox",
 	drafts_ready: "draft",
+};
+
+const AGENT_DESK_ICONS: Record<string, ReactNode> = {
+	money_agent: <HandCoinsIcon size={16} weight="bold" />,
+	lead_agent: <UsersIcon size={16} weight="bold" />,
+	support_agent: <LightningIcon size={16} weight="bold" />,
+	ops_agent: <ClockIcon size={16} weight="bold" />,
 };
 
 function AttentionBucketRow({ bucket }: { bucket: AttentionBucket }) {
@@ -203,6 +211,44 @@ function AttentionNextActionRow({ action }: { action: AttentionNextAction }) {
 	);
 }
 
+function AgentDeskRow({ desk }: { desk: AgentDeskSummary }) {
+	const firstAction = desk.nextActions[0];
+	const row = (
+		<div className="flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-kumo-tint">
+			<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
+				{AGENT_DESK_ICONS[desk.id] || <FileTextIcon size={16} weight="bold" />}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center gap-2">
+					<span className="truncate text-sm font-semibold text-kumo-default">
+						{desk.label}
+					</span>
+					<Badge variant="secondary">{desk.signalCount}</Badge>
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{firstAction
+						? `${firstAction.mailboxId} · ${firstAction.label}`
+						: desk.description}
+				</div>
+				<div className="truncate text-xs text-kumo-subtle">
+					{desk.mailboxIds.slice(0, 3).join(", ")}
+				</div>
+			</div>
+			{firstAction && (
+				<ArrowRightIcon size={16} className="shrink-0 text-kumo-subtle" />
+			)}
+		</div>
+	);
+
+	if (!firstAction) return row;
+
+	return (
+		<RouterLink to={attentionActionHref(firstAction)} className="block no-underline">
+			{row}
+		</RouterLink>
+	);
+}
+
 function AttentionDesk() {
 	const {
 		data: attention,
@@ -301,6 +347,21 @@ function AttentionDesk() {
 					<div className="divide-y divide-kumo-line">
 						{attention.nextActions.map((action) => (
 							<AttentionNextActionRow key={action.id} action={action} />
+						))}
+					</div>
+				</div>
+			)}
+
+			{attention.agentDesks.length > 0 && (
+				<div className="border-t border-kumo-line">
+					<div className="px-5 py-3">
+						<div className="text-xs font-semibold uppercase text-kumo-subtle">
+							Agent desks
+						</div>
+					</div>
+					<div className="grid divide-y divide-kumo-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+						{attention.agentDesks.map((desk) => (
+							<AgentDeskRow key={desk.id} desk={desk} />
 						))}
 					</div>
 				</div>

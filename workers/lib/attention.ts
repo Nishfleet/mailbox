@@ -4,7 +4,10 @@
 
 import type { Env } from "../types";
 import { mapWithConcurrency } from "./async";
-import { buildAttentionNextActions } from "./attention-workflow.js";
+import {
+	buildAgentDeskSummaries,
+	buildAttentionNextActions,
+} from "./attention-workflow.js";
 import { listMailboxes } from "./email-helpers";
 
 const MAILBOX_ATTENTION_TIMEOUT_MS = 5000;
@@ -78,6 +81,15 @@ export interface AttentionNextAction {
 	threadId?: string | null;
 	subject: string;
 	reason: string;
+}
+
+export interface AgentDeskSummary {
+	id: string;
+	label: string;
+	description: string;
+	signalCount: number;
+	mailboxIds: string[];
+	nextActions: AttentionNextAction[];
 }
 
 export interface MailboxAttentionSummary {
@@ -345,6 +357,9 @@ export async function buildAttentionSummary(env: Env) {
 	const nextActions = buildAttentionNextActions(
 		allTopItems,
 	) as AttentionNextAction[];
+	const agentDesks = buildAgentDeskSummaries(
+		allTopItems,
+	) as AgentDeskSummary[];
 	const hasMoreTopItems =
 		allTopItems.length > topItems.length ||
 		mailboxes.some((mailbox) => mailbox.hasMoreTopItems);
@@ -362,6 +377,7 @@ export async function buildAttentionSummary(env: Env) {
 		mailboxes,
 		topItems,
 		nextActions,
+		agentDesks,
 		topItemsLimit: SUMMARY_TOP_ITEMS_LIMIT,
 		topItemsSampled: true,
 		hasMoreTopItems,

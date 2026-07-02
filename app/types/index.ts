@@ -59,6 +59,15 @@ export interface AttentionNextAction {
 	reason: string;
 }
 
+export interface AgentDeskSummary {
+	id: string;
+	label: string;
+	description: string;
+	signalCount: number;
+	mailboxIds: string[];
+	nextActions: AttentionNextAction[];
+}
+
 export interface AttentionBucket {
 	id: AttentionBucketId;
 	label: string;
@@ -101,6 +110,7 @@ export interface AttentionSummary {
 	mailboxes: MailboxAttentionSummary[];
 	topItems: AttentionItem[];
 	nextActions: AttentionNextAction[];
+	agentDesks: AgentDeskSummary[];
 	topItemsLimit: number;
 	topItemsSampled: boolean;
 	hasMoreTopItems: boolean;
