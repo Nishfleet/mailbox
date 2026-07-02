@@ -8,4 +8,6 @@ export interface Env extends Cloudflare.Env {
 	INTERNAL_EMAIL_TOKEN?: string;
 	PUSHOVER_APP_TOKEN?: string;
 	PUSHOVER_USER_KEY?: string;
+	PUSHOVER_EMAIL_ALIAS?: string;
+	ATTENTION_NOTIFY_FROM_EMAIL?: string;
 }

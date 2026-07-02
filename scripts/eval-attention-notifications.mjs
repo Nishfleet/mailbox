@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+	buildAttentionNotificationEmail,
 	buildAttentionNotification,
 	shouldSendAttentionNotification,
 } from "../workers/lib/attention-notification-core.js";
@@ -36,6 +37,10 @@ assert.match(notification.message, /Review draft: billing@0509\.io - Re: Upgrade
 assert.match(notification.message, /Handle money: billing@0509\.io - Invoice failed/);
 assert.match(notification.message, /Work lead: hello@siterep\.net - Demo request/);
 assert.equal(notification.message.includes("Old support follow-up"), false);
+
+const email = buildAttentionNotificationEmail(notification);
+assert.equal(email.subject, "Attention Desk: 5 signals");
+assert.match(email.text, /Open Attention Desk: https:\/\/inbox\.example\.com\/mail\/\?attention=1/);
 
 const firstDecision = shouldSendAttentionNotification(summary, {}, {
 	now,
@@ -94,4 +99,3 @@ console.log(
 		expiredDecision: expiredDecision.reason,
 	}),
 );
-

@@ -110,6 +110,17 @@ export function buildAttentionNotification(summary, options = {}) {
 	};
 }
 
+export function buildAttentionNotificationEmail(notification) {
+	return {
+		subject: notification.title,
+		text: [
+			notification.message,
+			"",
+			`${notification.urlTitle}: ${notification.url}`,
+		].join("\n"),
+	};
+}
+
 export function shouldSendAttentionNotification(summary, state = {}, options = {}) {
 	const minSignals = positiveInteger(options.minSignals, DEFAULT_MIN_SIGNALS);
 	const cooldownMinutes = positiveInteger(
@@ -153,4 +164,3 @@ export function shouldSendAttentionNotification(summary, state = {}, options = {
 		signalCount,
 	};
 }
-
