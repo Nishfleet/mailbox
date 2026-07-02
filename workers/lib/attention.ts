@@ -16,6 +16,7 @@ const ATTENTION_START_BUFFER_MS = 500;
 const BUCKET_TOP_ITEMS_LIMIT = 5;
 const SUMMARY_TOP_ITEMS_LIMIT = 12;
 const MAILBOX_ATTENTION_CONCURRENCY = 6;
+const NOTIFICATION_ACTION_LIMIT = 12;
 
 const BUCKETS = [
 	{
@@ -54,6 +55,12 @@ const ATTENTION_BUCKET_PRIORITY: Record<AttentionBucketId, number> = {
 	aging: 3,
 	drafts_ready: 4,
 };
+
+const NOTIFICATION_BUCKETS = new Set<AttentionBucketId>([
+	"money",
+	"leads",
+	"act_now",
+]);
 
 export interface AttentionItem {
 	id: string;
@@ -358,6 +365,10 @@ export async function buildAttentionSummary(env: Env) {
 	const nextActions = buildAttentionNextActions(
 		allTopItems,
 	) as AttentionNextAction[];
+	const notificationActions = buildAttentionNextActions(
+		allTopItems.filter((item) => NOTIFICATION_BUCKETS.has(item.bucket)),
+		NOTIFICATION_ACTION_LIMIT,
+	) as AttentionNextAction[];
 	const agentDesks = buildAgentDeskSummaries(
 		allTopItems,
 	) as AgentDeskSummary[];
@@ -378,6 +389,7 @@ export async function buildAttentionSummary(env: Env) {
 		mailboxes,
 		topItems,
 		nextActions,
+		notificationActions,
 		agentDesks,
 		topItemsLimit: SUMMARY_TOP_ITEMS_LIMIT,
 		topItemsSampled: true,

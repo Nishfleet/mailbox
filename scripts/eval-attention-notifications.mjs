@@ -22,6 +22,10 @@ const summary = {
 	unavailableMailboxCount: 0,
 	attentionSignalCount: trace.input.length,
 	nextActions: buildAttentionNextActions(trace.input),
+	notificationActions: buildAttentionNextActions(
+		trace.input.filter((item) => ["money", "leads", "act_now"].includes(item.bucket)),
+		12,
+	),
 };
 
 const notification = buildAttentionNotification(summary, {
@@ -29,17 +33,17 @@ const notification = buildAttentionNotification(summary, {
 	maxActions: 3,
 });
 
-assert.equal(notification.title, "Attention Desk: 5 signals");
+assert.equal(notification.title, "Attention Desk: 2 priority signals");
 assert.equal(notification.url, "https://inbox.example.com/mail/?attention=1");
 assert.equal(notification.urlTitle, "Open Attention Desk");
-assert.equal(notification.actionCount, 3);
-assert.match(notification.message, /Review draft: billing@0509\.io - Re: Upgrade request/);
+assert.equal(notification.actionCount, 2);
+assert.equal(notification.message.includes("Review draft"), false);
 assert.match(notification.message, /Handle money: billing@0509\.io - Invoice failed/);
 assert.match(notification.message, /Work lead: hello@siterep\.net - Demo request/);
 assert.equal(notification.message.includes("Old support follow-up"), false);
 
 const email = buildAttentionNotificationEmail(notification);
-assert.equal(email.subject, "Attention Desk: 5 signals");
+assert.equal(email.subject, "Attention Desk: 2 priority signals");
 assert.match(email.text, /Open Attention Desk: https:\/\/inbox\.example\.com\/mail\/\?attention=1/);
 
 const firstDecision = shouldSendAttentionNotification(summary, {}, {
@@ -87,13 +91,13 @@ const changedDecision = shouldSendAttentionNotification({
 	cooldownMinutes: 60,
 	maxActions: 3,
 });
-assert.equal(changedDecision.shouldSend, true);
-assert.equal(changedDecision.reason, "changed");
+assert.equal(changedDecision.shouldSend, false);
+assert.equal(changedDecision.reason, "unchanged");
 
 const fresherDecision = shouldSendAttentionNotification({
 	...summary,
-	nextActions: summary.nextActions.map((action, index) =>
-		index === 0 ? { ...action, latestAt: "2026-07-02T05:04:00.000Z" } : action,
+	notificationActions: summary.notificationActions.map((action) =>
+		action.bucket === "money" ? { ...action, latestAt: "2026-07-02T05:04:00.000Z" } : action,
 	),
 }, {
 	lastSentAt: now.toISOString(),
@@ -111,6 +115,7 @@ const quietDecision = shouldSendAttentionNotification({
 	...summary,
 	attentionSignalCount: 0,
 	nextActions: [],
+	notificationActions: [],
 }, {}, {
 	now,
 	minSignals: 1,
@@ -119,6 +124,100 @@ const quietDecision = shouldSendAttentionNotification({
 });
 assert.equal(quietDecision.shouldSend, false);
 assert.equal(quietDecision.reason, "below-threshold");
+
+const draftOnlyDecision = shouldSendAttentionNotification({
+	...summary,
+	attentionSignalCount: 3,
+	nextActions: summary.nextActions.filter((action) => action.bucket === "drafts_ready"),
+	notificationActions: [],
+}, {}, {
+	now,
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(draftOnlyDecision.shouldSend, false);
+assert.equal(draftOnlyDecision.reason, "empty");
+
+const draftCrowdedSummary = {
+	...summary,
+	attentionSignalCount: 4,
+	nextActions: [
+		{
+			id: "billing@0509.io:thread-draft-1",
+			bucket: "drafts_ready",
+			label: "Review draft",
+			mailboxId: "billing@0509.io",
+			emailId: "draft-1",
+			threadId: "thread-draft-1",
+			latestAt: "2026-07-02T05:01:00.000Z",
+			subject: "Re: internal draft 1",
+		},
+		{
+			id: "billing@0509.io:thread-draft-2",
+			bucket: "drafts_ready",
+			label: "Review draft",
+			mailboxId: "billing@0509.io",
+			emailId: "draft-2",
+			threadId: "thread-draft-2",
+			latestAt: "2026-07-02T05:02:00.000Z",
+			subject: "Re: internal draft 2",
+		},
+		{
+			id: "billing@0509.io:thread-draft-3",
+			bucket: "drafts_ready",
+			label: "Review draft",
+			mailboxId: "billing@0509.io",
+			emailId: "draft-3",
+			threadId: "thread-draft-3",
+			latestAt: "2026-07-02T05:03:00.000Z",
+			subject: "Re: internal draft 3",
+		},
+	],
+	notificationActions: [{
+		id: "billing@0509.io:thread-money-real",
+		bucket: "money",
+		label: "Handle money",
+		mailboxId: "billing@0509.io",
+		emailId: "email-money-real",
+		threadId: "thread-money-real",
+		latestAt: "2026-07-02T05:04:00.000Z",
+		subject: "Card failed",
+	}],
+};
+const draftCrowdedDecision = shouldSendAttentionNotification(draftCrowdedSummary, {}, {
+	now,
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(draftCrowdedDecision.shouldSend, true);
+assert.equal(draftCrowdedDecision.reason, "changed");
+assert.match(draftCrowdedDecision.notification.message, /Card failed/);
+assert.equal(draftCrowdedDecision.notification.message.includes("internal draft"), false);
+
+const actNowDecision = shouldSendAttentionNotification({
+	...summary,
+	attentionSignalCount: 1,
+	nextActions: [],
+	notificationActions: [{
+		id: "hello@0509.io:thread-real",
+		bucket: "act_now",
+		label: "Reply next",
+		mailboxId: "hello@0509.io",
+		emailId: "email-real",
+		threadId: "thread-real",
+		latestAt: "2026-07-02T05:04:00.000Z",
+		subject: "Customer question",
+	}],
+}, {}, {
+	now,
+	minSignals: 1,
+	cooldownMinutes: 60,
+	maxActions: 3,
+});
+assert.equal(actNowDecision.shouldSend, true);
+assert.equal(actNowDecision.reason, "changed");
 
 console.log(
 	JSON.stringify({
@@ -131,5 +230,8 @@ console.log(
 		expiredDecision: expiredDecision.reason,
 		changedDecision: changedDecision.reason,
 		fresherDecision: fresherDecision.reason,
+		draftOnlyDecision: draftOnlyDecision.reason,
+		draftCrowdedDecision: draftCrowdedDecision.reason,
+		actNowDecision: actNowDecision.reason,
 	}),
 );

@@ -6,6 +6,7 @@ const DEFAULT_MAX_ACTIONS = 3;
 const DEFAULT_MIN_SIGNALS = 1;
 const DEFAULT_COOLDOWN_MINUTES = 60;
 const DEFAULT_BASE_URL = "https://0509-support-inbox.nishant345.workers.dev";
+const DEFAULT_NOTIFY_BUCKETS = new Set(["money", "leads", "act_now"]);
 const MAX_MESSAGE_LENGTH = 900;
 
 function positiveInteger(value, fallback) {
@@ -67,8 +68,6 @@ function notificationFingerprint(summary, actions) {
 	return hashString(
 		[
 			summary.triageVersion,
-			summary.attentionSignalCount,
-			summary.unavailableMailboxCount,
 			...actions.map(actionFingerprint),
 		].join("|"),
 	);
@@ -81,22 +80,30 @@ function actionLine(action) {
 	return mailbox ? `${label}: ${mailbox} - ${subject}` : `${label}: ${subject}`;
 }
 
-export function buildAttentionNotification(summary, options = {}) {
-	const signalCount = positiveInteger(summary?.attentionSignalCount, 0);
-	if (signalCount < 1) return null;
+function notificationActions(summary, maxActions, options) {
+	const buckets = options.notifyBuckets instanceof Set
+		? options.notifyBuckets
+		: DEFAULT_NOTIFY_BUCKETS;
+	const candidates = Array.isArray(summary?.notificationActions)
+		? summary.notificationActions
+		: Array.isArray(summary?.nextActions)
+			? summary.nextActions
+			: [];
+	return candidates.length
+		? candidates
+			.filter((action) => buckets.has(String(action.bucket || "")))
+			.slice(0, maxActions)
+		: [];
+}
 
+export function buildAttentionNotification(summary, options = {}) {
 	const maxActions = positiveInteger(options.maxActions, DEFAULT_MAX_ACTIONS);
 	const baseUrl = normalizeBaseUrl(options.baseUrl);
-	const actions = Array.isArray(summary?.nextActions)
-		? summary.nextActions.slice(0, maxActions)
-		: [];
-	const title = `Attention Desk: ${pluralize(signalCount, "signal")}`;
-	const fallback = `${pluralize(signalCount, "signal")} across ${pluralize(
-		positiveInteger(summary?.mailboxCount, 0),
-		"mailbox",
-		"mailboxes",
-	)}.`;
-	const lines = actions.length > 0 ? actions.map(actionLine) : [fallback];
+	const actions = notificationActions(summary, maxActions, options);
+	if (actions.length === 0) return null;
+	const signalCount = actions.length;
+	const title = `Attention Desk: ${pluralize(signalCount, "priority signal")}`;
+	const lines = actions.map(actionLine);
 	const message = truncate(lines.join("\n"), MAX_MESSAGE_LENGTH);
 
 	return {
