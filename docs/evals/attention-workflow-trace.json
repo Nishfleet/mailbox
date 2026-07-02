@@ -1,0 +1,102 @@
+{
+  "name": "attention-next-actions-v1",
+  "triageVersion": "heuristic-v2",
+  "input": [
+    {
+      "id": "draft-ready",
+      "mailboxId": "billing@0509.io",
+      "emailId": "draft-1",
+      "threadId": "thread-draft",
+      "folderId": "draft",
+      "bucket": "drafts_ready",
+      "subject": "Re: Upgrade request",
+      "sender": "billing@0509.io",
+      "recipient": "customer@example.com",
+      "date": "2026-07-02T02:00:00.000Z",
+      "reason": "Draft waiting for review",
+      "confidence": "high"
+    },
+    {
+      "id": "billing-money",
+      "mailboxId": "billing@0509.io",
+      "emailId": "email-money",
+      "threadId": "thread-money",
+      "folderId": "inbox",
+      "bucket": "money",
+      "subject": "Invoice failed",
+      "sender": "customer@example.com",
+      "recipient": "billing@0509.io",
+      "date": "2026-07-02T03:00:00.000Z",
+      "reason": "Billing keyword match",
+      "confidence": "high"
+    },
+    {
+      "id": "billing-act-now-duplicate",
+      "mailboxId": "billing@0509.io",
+      "emailId": "email-money",
+      "threadId": "thread-money",
+      "folderId": "inbox",
+      "bucket": "act_now",
+      "subject": "Invoice failed",
+      "sender": "customer@example.com",
+      "recipient": "billing@0509.io",
+      "date": "2026-07-02T03:00:00.000Z",
+      "reason": "Unread inbox message",
+      "confidence": "high"
+    },
+    {
+      "id": "lead",
+      "mailboxId": "hello@siterep.net",
+      "emailId": "email-lead",
+      "threadId": "thread-lead",
+      "folderId": "inbox",
+      "bucket": "leads",
+      "subject": "Demo request",
+      "sender": "buyer@example.com",
+      "recipient": "hello@siterep.net",
+      "date": "2026-07-02T01:00:00.000Z",
+      "reason": "Sales keyword match",
+      "confidence": "medium"
+    },
+    {
+      "id": "aging",
+      "mailboxId": "support@seofixkit.com",
+      "emailId": "email-aging",
+      "threadId": "thread-aging",
+      "folderId": "inbox",
+      "bucket": "aging",
+      "subject": "Old support follow-up",
+      "sender": "customer@example.com",
+      "recipient": "support@seofixkit.com",
+      "date": "2026-07-01T00:00:00.000Z",
+      "reason": "Unread inbox mail older than 24 hours",
+      "confidence": "medium"
+    }
+  ],
+  "expectedNextActions": [
+    {
+      "id": "billing@0509.io:thread-draft",
+      "bucket": "drafts_ready",
+      "label": "Review draft",
+      "mailboxId": "billing@0509.io",
+      "emailId": "draft-1",
+      "threadId": "thread-draft"
+    },
+    {
+      "id": "billing@0509.io:thread-money",
+      "bucket": "money",
+      "label": "Handle money",
+      "mailboxId": "billing@0509.io",
+      "emailId": "email-money",
+      "threadId": "thread-money"
+    },
+    {
+      "id": "hello@siterep.net:thread-lead",
+      "bucket": "leads",
+      "label": "Work lead",
+      "mailboxId": "hello@siterep.net",
+      "emailId": "email-lead",
+      "threadId": "thread-lead"
+    }
+  ]
+}

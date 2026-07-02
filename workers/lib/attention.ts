@@ -4,6 +4,7 @@
 
 import type { Env } from "../types";
 import { mapWithConcurrency } from "./async";
+import { buildAttentionNextActions } from "./attention-workflow.js";
 import { listMailboxes } from "./email-helpers";
 
 const MAILBOX_ATTENTION_TIMEOUT_MS = 5000;
@@ -49,14 +50,6 @@ const ATTENTION_BUCKET_PRIORITY: Record<AttentionBucketId, number> = {
 	act_now: 2,
 	aging: 3,
 	drafts_ready: 4,
-};
-
-const WORKFLOW_BUCKET_PRIORITY: Record<AttentionBucketId, number> = {
-	drafts_ready: 0,
-	money: 1,
-	leads: 2,
-	act_now: 3,
-	aging: 4,
 };
 
 export interface AttentionItem {
@@ -153,69 +146,6 @@ function sortItemsByAttentionPriority(a: AttentionItem, b: AttentionItem) {
 	const priorityDelta =
 		ATTENTION_BUCKET_PRIORITY[a.bucket] - ATTENTION_BUCKET_PRIORITY[b.bucket];
 	return priorityDelta || sortItemsByDateDesc(a, b);
-}
-
-function sortItemsByWorkflowPriority(a: AttentionItem, b: AttentionItem) {
-	const priorityDelta =
-		WORKFLOW_BUCKET_PRIORITY[a.bucket] - WORKFLOW_BUCKET_PRIORITY[b.bucket];
-	return priorityDelta || sortItemsByDateDesc(a, b);
-}
-
-function nextActionCopy(item: AttentionItem) {
-	switch (item.bucket) {
-		case "drafts_ready":
-			return {
-				label: "Review draft",
-				description: "Open the saved draft, then send or discard it.",
-			};
-		case "money":
-			return {
-				label: "Handle money",
-				description: "Review the billing context and draft the customer-safe reply.",
-			};
-		case "leads":
-			return {
-				label: "Work lead",
-				description: "Read the thread and draft the next commercial reply.",
-			};
-		case "act_now":
-			return {
-				label: "Reply next",
-				description: "Read the latest thread context and prepare the response.",
-			};
-		case "aging":
-			return {
-				label: "Clear aging",
-				description: "Decide whether to reply, archive, or leave it waiting.",
-			};
-	}
-}
-
-function buildNextActions(items: AttentionItem[]) {
-	const seen = new Set<string>();
-	const actions: AttentionNextAction[] = [];
-
-	for (const item of items.sort(sortItemsByWorkflowPriority)) {
-		const key = `${item.mailboxId}:${item.threadId || item.emailId}`;
-		if (seen.has(key)) continue;
-		seen.add(key);
-		const copy = nextActionCopy(item);
-		actions.push({
-			id: key,
-			bucket: item.bucket,
-			label: copy.label,
-			description: copy.description,
-			mailboxId: item.mailboxId,
-			folderId: item.folderId,
-			emailId: item.emailId,
-			threadId: item.threadId,
-			subject: item.subject,
-			reason: item.reason,
-		});
-		if (actions.length >= 3) break;
-	}
-
-	return actions;
 }
 
 async function withTimeout<T>(
@@ -412,7 +342,9 @@ export async function buildAttentionSummary(env: Env) {
 		.flatMap((mailbox) => mailbox.topItems)
 		.sort(sortItemsByAttentionPriority);
 	const topItems = allTopItems.slice(0, SUMMARY_TOP_ITEMS_LIMIT);
-	const nextActions = buildNextActions(allTopItems);
+	const nextActions = buildAttentionNextActions(
+		allTopItems,
+	) as AttentionNextAction[];
 	const hasMoreTopItems =
 		allTopItems.length > topItems.length ||
 		mailboxes.some((mailbox) => mailbox.hasMoreTopItems);
