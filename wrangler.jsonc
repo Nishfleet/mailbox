@@ -9,12 +9,21 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"triggers": {
+		"crons": [
+			"*/15 * * * *"
+		]
+	},
 	"vars": {
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
 		"DOMAINS": "0509.io,0509.in,inish.in,aiconverter.app,siterep.net,tinystudio.io,tinystudio.in,seofixkit.com",
-		"EMAIL_ADDRESSES": []
+		"EMAIL_ADDRESSES": [],
+		"ATTENTION_NOTIFY_BASE_URL": "https://0509-support-inbox.nishant345.workers.dev",
+		"ATTENTION_NOTIFY_MIN_SIGNALS": "1",
+		"ATTENTION_NOTIFY_COOLDOWN_MINUTES": "60",
+		"ATTENTION_NOTIFY_MAX_ACTIONS": "3"
 	},
 	"send_email": [
 		{
