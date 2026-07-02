@@ -3,11 +3,16 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Env } from "../types";
+import { sendEmail } from "../email-sender";
 import { buildAttentionSummary } from "./attention";
-import { shouldSendAttentionNotification } from "./attention-notification-core.js";
+import {
+	buildAttentionNotificationEmail,
+	shouldSendAttentionNotification,
+} from "./attention-notification-core.js";
 
 const STATE_KEY = "ops/attention-notification-state.json";
 const DEFAULT_BASE_URL = "https://0509-support-inbox.nishant345.workers.dev";
+const DEFAULT_FROM_EMAIL = "alerts@0509.io";
 const PUSHOVER_MESSAGES_URL = "https://api.pushover.net/1/messages.json";
 
 interface AttentionNotificationState {
@@ -16,7 +21,9 @@ interface AttentionNotificationState {
 	lastSignalCount?: number;
 	lastActionCount?: number;
 	lastCron?: string;
+	lastDeliveryMethod?: "api" | "email";
 	lastPushoverRequest?: string;
+	lastEmailMessageId?: string;
 }
 
 interface AttentionNotificationOptions {
@@ -92,14 +99,46 @@ async function sendPushoverNotification(
 	}
 }
 
+async function sendPushoverEmailNotification(
+	env: Env,
+	notification: {
+		title: string;
+		message: string;
+		url: string;
+		urlTitle: string;
+	},
+) {
+	if (!env.PUSHOVER_EMAIL_ALIAS) {
+		throw new Error("PUSHOVER_EMAIL_ALIAS is not configured");
+	}
+
+	const email = buildAttentionNotificationEmail(notification);
+	return sendEmail(env.EMAIL, {
+		to: env.PUSHOVER_EMAIL_ALIAS,
+		from: {
+			email: env.ATTENTION_NOTIFY_FROM_EMAIL || DEFAULT_FROM_EMAIL,
+			name: "0509 Attention Desk",
+		},
+		subject: email.subject,
+		text: email.text,
+	});
+}
+
+function getDeliveryMethod(env: Env): "api" | "email" | null {
+	if (env.PUSHOVER_APP_TOKEN && env.PUSHOVER_USER_KEY) return "api";
+	if (env.PUSHOVER_EMAIL_ALIAS) return "email";
+	return null;
+}
+
 export async function runAttentionNotificationCheck(
 	env: Env,
 	options: AttentionNotificationOptions = {},
 ) {
-	if (!env.PUSHOVER_APP_TOKEN || !env.PUSHOVER_USER_KEY) {
+	const deliveryMethod = getDeliveryMethod(env);
+	if (!deliveryMethod) {
 		return {
 			status: "disabled" as const,
-			reason: "missing-pushover-credentials",
+			reason: "missing-pushover-destination",
 		};
 	}
 
@@ -127,24 +166,26 @@ export async function runAttentionNotificationCheck(
 		};
 	}
 
-	const pushoverResponse = await sendPushoverNotification(
-		env,
-		decision.notification,
-	);
+	const delivery =
+		deliveryMethod === "api"
+			? await sendPushoverNotification(env, decision.notification)
+			: await sendPushoverEmailNotification(env, decision.notification);
 	await writeNotificationState(env, {
 		lastSentAt: now.toISOString(),
 		lastFingerprint: decision.notification.fingerprint,
 		lastSignalCount: decision.notification.signalCount,
 		lastActionCount: decision.notification.actionCount,
 		lastCron: options.cron,
-		lastPushoverRequest: pushoverResponse.request,
+		lastDeliveryMethod: deliveryMethod,
+		lastPushoverRequest: "request" in delivery ? delivery.request : undefined,
+		lastEmailMessageId: "messageId" in delivery ? delivery.messageId : undefined,
 	});
 
 	return {
 		status: "sent" as const,
 		reason: decision.reason,
+		deliveryMethod,
 		signalCount: decision.notification.signalCount,
 		actionCount: decision.notification.actionCount,
 	};
 }
-
