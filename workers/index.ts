@@ -14,8 +14,7 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
-	isOwnedInternalEmail,
-	hasTrustedInternalEmailHeader,
+	isTrustedInternalOwnedEmail,
 	INTERNAL_EMAIL_HEADER,
 	isOwnedDomainDelivery,
 	OWNED_DOMAIN_DELIVERY_ERROR,
@@ -447,14 +446,11 @@ async function receiveEmail(
 	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 	const sender = (parsedEmail.from?.address || "").toLowerCase();
-	const envelopeSender = String(event.from || "").toLowerCase();
-	const envelopeRecipient = String(event.to || "").toLowerCase();
-	const isInternalOwnedNotification = isOwnedInternalEmail(env, sender, [
+	const isInternalOwnedNotification = isTrustedInternalOwnedEmail(env, sender, [
 		...allRecipients,
 		...ccRecipients,
 		...bccRecipients,
-	]) && isOwnedInternalEmail(env, envelopeSender, [envelopeRecipient])
-		&& hasTrustedInternalEmailHeader(env, parsedEmail.headers);
+	], parsedEmail.headers);
 	const isSpam = !isInternalOwnedNotification && isHighConfidenceSpam(event.headers);
 
 	let mailboxId: string | undefined;

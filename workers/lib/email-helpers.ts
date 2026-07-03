@@ -102,6 +102,20 @@ export function hasTrustedInternalEmailHeader(
 	});
 }
 
+export function isTrustedInternalOwnedEmail(
+	env: Env,
+	sender: string,
+	recipients: string[],
+	headers: Array<{ key?: string | null; value?: string | null }> | undefined,
+) {
+	// The signed header is the trust boundary. SMTP envelope fields can be
+	// provider-shaped on routed internal sends, so do not require them here.
+	return (
+		isOwnedInternalEmail(env, sender, recipients) &&
+		hasTrustedInternalEmailHeader(env, headers)
+	);
+}
+
 // ── DO Stub ────────────────────────────────────────────────────────
 
 /**
