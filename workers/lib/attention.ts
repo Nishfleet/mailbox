@@ -3,12 +3,12 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Env } from "../types";
-import { mapWithConcurrency } from "./async";
+import { mapWithConcurrency, withTimeout } from "./async";
 import {
 	buildAgentDeskSummaries,
 	buildAttentionNextActions,
 } from "./attention-workflow.js";
-import { listMailboxes } from "./email-helpers";
+import { getMailboxStub, listMailboxes } from "./email-helpers";
 
 const MAILBOX_ATTENTION_TIMEOUT_MS = 5000;
 const ATTENTION_SUMMARY_BUDGET_MS = 12000;
@@ -168,35 +168,13 @@ function sortItemsByAttentionPriority(a: AttentionItem, b: AttentionItem) {
 	return priorityDelta || sortItemsByDateDesc(a, b);
 }
 
-async function withTimeout<T>(
-	promise: Promise<T>,
-	timeoutMs: number,
-	onTimeout: () => void,
-): Promise<T | null> {
-	let timeoutId: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<null>((resolve) => {
-		timeoutId = setTimeout(() => {
-			onTimeout();
-			resolve(null);
-		}, timeoutMs);
-	});
-
-	try {
-		return await Promise.race([promise, timeout]);
-	} finally {
-		if (timeoutId !== undefined) clearTimeout(timeoutId);
-	}
-}
-
 async function getMailboxAttention(
 	env: Env,
 	mailboxId: string,
 	timeoutMs: number = MAILBOX_ATTENTION_TIMEOUT_MS,
 ): Promise<MailboxAttentionSummary> {
 	try {
-		const stub = env.MAILBOX.get(
-			env.MAILBOX.idFromName(mailboxId),
-		) as unknown as MailboxAttentionStub;
+		const stub = getMailboxStub(env, mailboxId) as unknown as MailboxAttentionStub;
 		const summary = await withTimeout(
 			stub.getAttentionSummary(),
 			timeoutMs,
@@ -223,17 +201,26 @@ async function getMailboxAttention(
 	}
 }
 
-function unavailableMailbox(mailboxId: string): MailboxAttentionSummary {
+function baseMailboxSummary(
+	mailboxId: string,
+	status: "ok" | "unavailable",
+	counts: {
+		unreadInboxCount: number | null;
+		needsReplyCount: number | null;
+		draftCount: number | null;
+		moneyCount: number | null;
+		leadCount: number | null;
+		agingCount: number | null;
+		oldestPendingAt?: string | null;
+		lastInboundAt?: string | null;
+		newestDraftAt?: string | null;
+	},
+): MailboxAttentionSummary {
 	return {
 		mailboxId,
 		email: mailboxId,
-		status: "unavailable",
-		unreadInboxCount: null,
-		needsReplyCount: null,
-		draftCount: null,
-		moneyCount: null,
-		leadCount: null,
-		agingCount: null,
+		status,
+		...counts,
 		topItems: [],
 		topItemsLimit: 0,
 		topItemsSampled: true,
@@ -241,11 +228,19 @@ function unavailableMailbox(mailboxId: string): MailboxAttentionSummary {
 	};
 }
 
+function unavailableMailbox(mailboxId: string): MailboxAttentionSummary {
+	return baseMailboxSummary(mailboxId, "unavailable", {
+		unreadInboxCount: null,
+		needsReplyCount: null,
+		draftCount: null,
+		moneyCount: null,
+		leadCount: null,
+		agingCount: null,
+	});
+}
+
 function emptyMailbox(mailboxId: string): MailboxAttentionSummary {
-	return {
-		mailboxId,
-		email: mailboxId,
-		status: "ok",
+	return baseMailboxSummary(mailboxId, "ok", {
 		unreadInboxCount: 0,
 		needsReplyCount: 0,
 		draftCount: 0,
@@ -255,11 +250,7 @@ function emptyMailbox(mailboxId: string): MailboxAttentionSummary {
 		oldestPendingAt: null,
 		lastInboundAt: null,
 		newestDraftAt: null,
-		topItems: [],
-		topItemsLimit: 0,
-		topItemsSampled: true,
-		hasMoreTopItems: false,
-	};
+	});
 }
 
 function getConfiguredMailboxIds(env: Env, storedMailboxIds: string[]) {

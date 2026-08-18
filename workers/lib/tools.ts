@@ -46,6 +46,52 @@ type RateLimitStub = {
 	checkSendRateLimit: () => Promise<string | null>;
 };
 
+type ToolError = { error: string };
+
+/**
+ * Resolve the mailbox stub and enforce the owned-domain + send-rate-limit
+ * guards shared by send_reply and send_email.
+ */
+async function getSendStub(
+	env: Env,
+	mailboxId: string,
+	to: string,
+): Promise<{ stub: ReturnType<typeof getMailboxStub> } | ToolError> {
+	if (isOwnedDomainDelivery(env, mailboxId, to)) {
+		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
+	}
+	const stub = getMailboxStub(env, mailboxId);
+	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
+	if (rateLimitError) {
+		return { error: rateLimitError };
+	}
+	return { stub };
+}
+
+/**
+ * Verify (if requested) and convert a draft body to HTML.
+ * Shared by draft_reply and draft_email.
+ */
+async function prepareDraftBody(
+	env: Env,
+	body: string,
+	isPlainText: boolean | undefined,
+	runVerifyDraft: boolean | undefined,
+): Promise<{ body: string } | ToolError> {
+	let processedBody = body.trim();
+	if (runVerifyDraft) {
+		const sanitized = await verifyDraft(env.AI, processedBody);
+		if (!sanitized) {
+			return { error: "Draft verification failed — body could not be verified. Please try again." };
+		}
+		processedBody = sanitized;
+	}
+	if (isPlainText) {
+		processedBody = textToHtml(processedBody);
+	}
+	return { body: processedBody };
+}
+
 // ── list_mailboxes ─────────────────────────────────────────────────
 
 export async function toolListMailboxes(env: Env) {
@@ -146,20 +192,14 @@ export async function toolDraftReply(
 
 	const stub = getMailboxStub(env, mailboxId);
 
-	// Verify/sanitize if requested
-	let processedBody = params.body.trim();
-	if (params.runVerifyDraft) {
-		const sanitized = await verifyDraft(env.AI, processedBody);
-		if (!sanitized) {
-			return { error: "Draft verification failed — body could not be verified. Please try again." };
-		}
-		processedBody = sanitized;
-	}
-
-	// Convert plain text to HTML if needed
-	if (params.isPlainText) {
-		processedBody = textToHtml(processedBody);
-	}
+	const prepared = await prepareDraftBody(
+		env,
+		params.body,
+		params.isPlainText,
+		params.runVerifyDraft,
+	);
+	if ("error" in prepared) return prepared;
+	const processedBody = prepared.body;
 
 	const draftId = crypto.randomUUID();
 
@@ -232,18 +272,14 @@ export async function toolDraftEmail(
 
 	const stub = getMailboxStub(env, mailboxId);
 
-	let processedBody = params.body.trim();
-	if (params.runVerifyDraft) {
-		const sanitized = await verifyDraft(env.AI, processedBody);
-		if (!sanitized) {
-			return { error: "Draft verification failed — body could not be verified. Please try again." };
-		}
-		processedBody = sanitized;
-	}
-
-	if (params.isPlainText) {
-		processedBody = textToHtml(processedBody);
-	}
+	const prepared = await prepareDraftBody(
+		env,
+		params.body,
+		params.isPlainText,
+		params.runVerifyDraft,
+	);
+	if ("error" in prepared) return prepared;
+	const processedBody = prepared.body;
 
 	const draftId = crypto.randomUUID();
 
@@ -423,17 +459,9 @@ export async function toolSendReply(
 	| { status: "sent"; messageId: string; message: string }
 	| { error: string }
 > {
-	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
-		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
-	}
-
-	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
+	const prepared = await getSendStub(env, mailboxId, params.to);
+	if ("error" in prepared) return prepared;
+	const { stub } = prepared;
 
 	const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
 	if (!originalEmail) {
@@ -505,17 +533,9 @@ export async function toolSendEmail(
 	| { status: "sent"; messageId: string; message: string }
 	| { error: string }
 > {
-	if (isOwnedDomainDelivery(env, mailboxId, params.to)) {
-		return { error: OWNED_DOMAIN_DELIVERY_ERROR };
-	}
-
-	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
+	const prepared = await getSendStub(env, mailboxId, params.to);
+	if ("error" in prepared) return prepared;
+	const { stub } = prepared;
 
 	const fromDomain = mailboxId.split("@")[1];
 	if (!fromDomain) throw new Error("Invalid mailbox email address");

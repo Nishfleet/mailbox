@@ -14,6 +14,7 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
+	getMailboxStub,
 	isTrustedInternalOwnedEmail,
 	INTERNAL_EMAIL_HEADER,
 	isOwnedDomainDelivery,
@@ -26,7 +27,7 @@ import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { buildAttentionSummary } from "./lib/attention";
-import { mapWithConcurrency } from "./lib/async";
+import { mapWithConcurrency, withTimeout } from "./lib/async";
 
 type AppContext = Context<MailboxContext>;
 
@@ -75,29 +76,13 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	return v === "true" || v === "1";
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void): Promise<T | null> {
-	let timeoutId: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<null>((resolve) => {
-		timeoutId = setTimeout(() => {
-			onTimeout();
-			resolve(null);
-		}, timeoutMs);
-	});
-
-	try {
-		return await Promise.race([promise, timeout]);
-	} finally {
-		if (timeoutId !== undefined) clearTimeout(timeoutId);
-	}
-}
-
 async function getInboxUnreadCount(
 	env: Env,
 	mailboxId: string,
 	timeoutMs: number = MAILBOX_COUNT_TIMEOUT_MS,
 ): Promise<number | null> {
 	try {
-		const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+		const stub = getMailboxStub(env, mailboxId);
 		return await withTimeout(
 			stub.getInboxUnreadCount(),
 			timeoutMs,
@@ -191,7 +176,7 @@ app.post("/api/v1/mailboxes", async (c) => {
 	const defaultSettings = { fromName: name, forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
 	const finalSettings = { ...defaultSettings, ...settings };
 	await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
-	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email));
+	const stub = getMailboxStub(c.env, email);
 	await stub.getFolders();
 	return c.json({ id: email, email, name, settings: finalSettings }, 201);
 });
@@ -463,7 +448,7 @@ async function receiveEmail(
 	const messageId = crypto.randomUUID();
 	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
 
-	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+	const stub = getMailboxStub(env, mailboxId);
 
 	const attachmentData: StoredAttachment[] = [];
 	if (parsedEmail.attachments) {
