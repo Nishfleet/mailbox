@@ -416,8 +416,72 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	return result;
 }
 
+/**
+ * The subset of Cloudflare's ForwardableEmailMessage this Worker uses.
+ * `event.raw` is fully consumed by streamToArrayBuffer() below (that is what
+ * stores the mail), and Cloudflare's documented "store then forward" pattern
+ * reads the raw stream first and calls message.forward() afterwards, so
+ * forwarding after storing is the supported order.
+ * See: https://developers.cloudflare.com/email-service/examples/email-routing/email-storage/
+ */
+type IncomingEmailEvent = {
+	raw: ReadableStream;
+	rawSize: number;
+	from?: string;
+	to?: string;
+	headers?: Headers;
+	forward?: (rcptTo: string, headers?: Headers) => Promise<unknown>;
+};
+
+/** Mailbox settings shape (defaults set in the POST /api/v1/mailboxes handler). */
+type MailboxForwardingSettings = {
+	forwarding?: { enabled?: boolean; email?: string };
+};
+
+/**
+ * Read the forwarding target for a mailbox, or null when it should not forward.
+ * Never throws: a malformed or unreadable settings object means "do not forward".
+ */
+async function getForwardingTarget(env: Env, mailboxId: string): Promise<string | null> {
+	try {
+		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+		if (!obj) return null;
+		const settings = (await obj.json()) as MailboxForwardingSettings;
+		const target = settings?.forwarding?.email?.trim() ?? "";
+		return settings?.forwarding?.enabled && target ? target : null;
+	} catch (e) {
+		console.error(`Failed to read forwarding settings for ${mailboxId}:`, (e as Error).message);
+		return null;
+	}
+}
+
+/**
+ * Apply the mailbox's `forwarding` setting to an inbound message.
+ *
+ * - Only forwards when the mailbox exists, forwarding is enabled and the
+ *   address is non-empty.
+ * - Failures are logged with console.error and swallowed: a broken forward must
+ *   never undo, delay or fail storing the mail, and must never rethrow (the
+ *   caller re-throws only on real processing errors).
+ */
+async function applyMailboxForwarding(
+	env: Env,
+	mailboxId: string,
+	event: IncomingEmailEvent,
+) {
+	const target = await getForwardingTarget(env, mailboxId);
+	if (!target) return;
+	if (typeof event.forward !== "function") return;
+	try {
+		await event.forward(target);
+		console.log(`Forwarded email for ${mailboxId} to ${target}`);
+	} catch (e) {
+		console.error(`Failed to forward email for ${mailboxId} to ${target}:`, (e as Error).message, (e as Error).stack);
+	}
+}
+
 async function receiveEmail(
-	event: { raw: ReadableStream; rawSize: number; from?: string; to?: string; headers?: Headers },
+	event: IncomingEmailEvent,
 	env: Env,
 	ctx: ExecutionContext,
 ) {
@@ -489,6 +553,15 @@ async function receiveEmail(
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(storedHeaders),
 	}, attachmentData);
 
+	// Brand mail must also reach Nish's Gmail while this inbox keeps storing it
+	// (issue #14). Deliberately placed immediately after the store and before the
+	// spam/internal early returns: those messages are stored too, and a
+	// false-positive spam classification is exactly the brand mail that must not
+	// disappear. A failed forward is logged and swallowed inside
+	// applyMailboxForwarding, so it can never lose the stored copy and never
+	// rethrows into the caller's retry-on-error semantics.
+	await applyMailboxForwarding(env, mailboxId, event);
+
 	if (isInternalOwnedNotification) {
 		console.log(`Stored internal owned-domain email for ${mailboxId} without auto-drafting.`);
 		return;
@@ -506,3 +579,4 @@ async function receiveEmail(
 }
 
 export { app, receiveEmail };
+export { getForwardingTarget, applyMailboxForwarding, type IncomingEmailEvent };

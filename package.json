@@ -24,6 +24,8 @@
 		"dev": "react-router dev",
 		"eval:attention-notifications": "node scripts/eval-attention-notifications.mjs",
 		"eval:attention-workflow": "node scripts/eval-attention-workflow.mjs",
+		"test": "vitest run --config workers/vitest.config.ts",
+		"test:changed": "vitest run --config workers/vitest.config.ts --changed origin/main",
 		"preview": "npm run build && vite preview",
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
@@ -60,6 +62,13 @@
 		"zustand": "^5.0.12"
 	},
 	"overrides": {
+		"@vitest/expect": "4.1.11",
+		"@vitest/mocker": "4.1.11",
+		"@vitest/pretty-format": "4.1.11",
+		"@vitest/runner": "4.1.11",
+		"@vitest/snapshot": "4.1.11",
+		"@vitest/spy": "4.1.11",
+		"@vitest/utils": "4.1.11",
 		"@cloudflare/kumo": {
 			"zod": "$zod"
 		},
@@ -101,6 +110,7 @@
 		"typescript": "^5.8.3",
 		"vite": "^6.3.3",
 		"vite-tsconfig-paths": "^5.1.4",
+		"vitest": "4.1.11",
 		"wrangler": "^4.74.0"
 	}
 }

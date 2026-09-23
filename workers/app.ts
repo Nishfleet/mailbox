@@ -125,14 +125,13 @@ export default {
 				}),
 		);
 	},
-	async email(
-		event: { raw: ReadableStream; rawSize: number; from?: string; to?: string; headers?: Headers },
-		env: Env,
-		ctx: ExecutionContext,
-	) {
+	async email(event: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
 		try {
 			await receiveEmail(event, env, ctx);
 		} catch (e) {
+			// A failure here means processing failed, not that a mailbox's optional
+			// forwarding address is unreachable — mailbox forwarding failures are
+			// logged inside receiveEmail and never reach this handler.
 			console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
 			// Re-throw so Cloudflare's email routing can retry delivery or bounce the message.
 			// Swallowing the error would silently drop the email.
