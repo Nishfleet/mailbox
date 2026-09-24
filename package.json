@@ -22,8 +22,6 @@
 		"cf-typegen": "wrangler types",
 		"deploy": "npm run build && wrangler deploy",
 		"dev": "react-router dev",
-		"eval:attention-notifications": "node scripts/eval-attention-notifications.mjs",
-		"eval:attention-workflow": "node scripts/eval-attention-workflow.mjs",
 		"test": "vitest run --config workers/vitest.config.ts",
 		"test:changed": "vitest run --config workers/vitest.config.ts --changed origin/main",
 		"preview": "npm run build && vite preview",
