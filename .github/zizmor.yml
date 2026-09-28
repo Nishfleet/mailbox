@@ -1,0 +1,16 @@
+# zizmor policy for this repo's workflows, run by the CI check job.
+# https://docs.zizmor.sh/configuration/
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # grade.yml calls the shared grader at @main on purpose, the same
+        # pin policy as Nishfleet/0509 (0509#5231, fleet-ops#8617).
+        Nishfleet/fleet-ops/*: ref-pin
+        "*": hash-pin
+  dangerous-triggers:
+    ignore:
+      # Runs only after CI succeeded on a push to main (job-level if), checks
+      # out that main commit with persist-credentials false, and never runs
+      # pull request code (fleet-ops#8615).
+      - deploy-production.yml
