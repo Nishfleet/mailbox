@@ -12,7 +12,7 @@ export default tseslint.config(
     files: ["app/**/*.{ts,tsx}", "workers/**/*.ts", "shared/**/*.ts"],
     ignores: ["**/*.test.ts"],
     languageOptions: { parser: tseslint.parser },
-    linterOptions: { noInlineConfig: true },
+    linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" },
     rules: {
       complexity: ["error", 10],
       "max-depth": ["error", 3],
