@@ -19,6 +19,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
+      - name: Lean-code suppressions only shrink
+        # eslint-suppressions.json holds the violations main had when the
+        # limits landed (81). A PR may lower this ceiling, never raise it.
+        run: test "$(jq '[.[][] | .count] | add' eslint-suppressions.json)" -le 81
       - run: npm test
 
   # Secret scan: gitleaks from the shared fleet CI standard. GitHub's own secret

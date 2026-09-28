@@ -1,0 +1,232 @@
+{
+  "app/components/AgentPanel.tsx": {
+    "max-lines-per-function": {
+      "count": 3
+    }
+  },
+  "app/components/ComposeEmail.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/ComposePanel.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/EmailAttachmentList.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/EmailIframe.tsx": {
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "app/components/EmailPanel.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/Header.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/MCPPanel.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/RichTextEditor.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/Sidebar.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/email-panel/EmailPanelDialogs.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/email-panel/EmailPanelToolbar.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/components/email-panel/ThreadMessage.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/entry.server.tsx": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "app/hooks/useComposeForm.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "app/lib/search-parser.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/lib/utils.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "app/queries/emails.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/queries/search.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "app/routes/email-list.tsx": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "app/routes/home.tsx": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "app/routes/mailbox.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/routes/search-results.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "app/routes/settings.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "workers/agent/index.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "workers/durableObject/index.ts": {
+    "complexity": {
+      "count": 4
+    },
+    "max-lines-per-function": {
+      "count": 3
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "workers/index.ts": {
+    "complexity": {
+      "count": 4
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "workers/lib/ai.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "workers/lib/attention-notifications.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "workers/lib/attention.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "workers/lib/email-helpers.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "workers/lib/tools.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 4
+    },
+    "max-params": {
+      "count": 3
+    }
+  },
+  "workers/mcp/index.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "workers/routes/reply-forward.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  }
+}
