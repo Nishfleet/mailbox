@@ -21,15 +21,80 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  # Secret scan: gitleaks from the shared fleet CI standard. GitHub's own secret
-  # scanning is a paid feature on private repos (Nish 2026-09-25: "setup secret scan").
+  # Secret scan: the gitleaks binary, pinned by version and sha256. Not
+  # gitleaks/gitleaks-action, which needs a paid licence on org repos. GitHub's
+  # own secret scanning is a paid feature on private repos (Nish 2026-09-25).
+  # Job name kept as the old reusable-workflow check name, "secret-scan / PR checks".
   secret-scan:
-    uses: Nishfleet/fleet-ops/.github/workflows/reusable-pr-checks.yml@baaf20529452b3f06a3cf8687ab894f5343aefaa # main 2026-09-25
+    name: secret-scan / PR checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
-    with:
-      node-version: ""
-      install-command: ""
-      verify-command: ""
-      timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned binary + sha256)
+        run: |
+          set -euo pipefail
+          GITLEAKS_VERSION="v8.30.1"
+          GITLEAKS_SHA256="551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+          ARCHIVE="gitleaks_8.30.1_linux_x64.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/${ARCHIVE}"
+          curl -fsSL --retry 3 --retry-delay 2 -o "${ARCHIVE}" "${URL}"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          install -d "${HOME}/.local/bin"
+          tar -xzf "${ARCHIVE}" -C "${HOME}/.local/bin" gitleaks
+          chmod +x "${HOME}/.local/bin/gitleaks"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan for secrets
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -uo pipefail
+          log_opts=""
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              log_opts="--no-merges --first-parent ${PR_BASE}..${PR_HEAD}"
+              ;;
+            push)
+              if [ "${PUSH_BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+                log_opts="-1"
+              else
+                log_opts="--no-merges --first-parent ${PUSH_BEFORE}..${GITHUB_SHA}"
+              fi
+              ;;
+          esac
+          args=(detect --redact -v --exit-code=2 --report-format=sarif --report-path=results.sarif)
+          if [ -n "$log_opts" ]; then
+            args+=(--log-opts "${log_opts}")
+          fi
+          set +e
+          gitleaks "${args[@]}"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "No leaks detected"
+          elif [ "$rc" -eq 2 ]; then
+            echo "::error::Leaks detected, see results.sarif for details"
+            exit 1
+          else
+            echo "::error::Unexpected exit code [$rc] from gitleaks"
+            exit 1
+          fi
+
+      - name: Upload gitleaks SARIF (ephemeral)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gitleaks-sarif
+          path: results.sarif
+          retention-days: 7
+          if-no-files-found: ignore
