@@ -8,6 +8,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { runAttentionNotificationCheck } from "./lib/attention-notifications";
+import { runRetentionPurge } from "./lib/retention";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
 
@@ -122,6 +123,15 @@ export default {
 				})
 				.catch((error) => {
 					console.error("Attention notification check failed", error);
+				}),
+		);
+		ctx.waitUntil(
+			runRetentionPurge(env, { now: new Date(controller.scheduledTime) })
+				.then((result) => {
+					console.log("Retention purge finished", result);
+				})
+				.catch((error) => {
+					console.error("Retention purge failed", error);
 				}),
 		);
 	},
