@@ -60,7 +60,33 @@ npm run dev
 ### Configuration
 
 1. Set your domain in `wrangler.jsonc`
-2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+2. Create the R2 bucket named in `wrangler.jsonc` (`r2_buckets[0].bucket_name`, currently `0509-support-inbox`): `wrangler r2 bucket create 0509-support-inbox`
+
+### Commands
+
+```bash
+npm run dev        # react-router dev
+npm test           # vitest, workers/**/*.test.ts (config: workers/vitest.config.ts)
+npm run typecheck  # wrangler types && react-router typegen && tsc -b
+```
+
+CI (`.github/workflows/ci.yml`) runs `typecheck` and `test` on every PR. Copy `.dev.vars.example` to `.dev.vars` for local secrets.
+
+### Where things are
+
+| Path | What lives there |
+| --- | --- |
+| `workers/app.ts` | Worker entry (`main` in `wrangler.jsonc`): `/mcp`, `/agents/*`, the `scheduled` cron handler, and the React Router SSR handler. Also re-exports the DO classes |
+| `workers/index.ts` | Hono API under `/api/v1/*` and `receiveEmail()` for inbound mail |
+| `workers/durableObject/` | `MailboxDO`: per-mailbox SQLite storage (`migrations.ts` for its schema, `workers/db/schema.ts` for Drizzle tables) |
+| `workers/agent/index.ts` | `EmailAgent` (AI chat agent, model and tools wiring) |
+| `workers/mcp/index.ts` | `EmailMCP` server |
+| `workers/lib/` | Shared worker logic: attention workflow and notifications, spam, attachments, schemas, AI helpers |
+| `workers/types.ts` | `Env` bindings type |
+| `app/routes.ts` | Frontend route registry; modules in `app/routes/` |
+| `app/components/`, `app/hooks/`, `app/queries/`, `app/services/api.ts` | UI, Zustand store, React Query hooks, API client |
+| `shared/` | Code imported by both `app/` and `workers/` |
+| `wrangler.jsonc` | Bindings (R2, DOs, AI, send_email), vars, cron trigger (every 15 minutes) |
 
 ### Deploy
 
