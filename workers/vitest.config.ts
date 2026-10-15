@@ -10,6 +10,7 @@
  * pulling it in would make `npm test` an authenticated command. These tests
  * exercise `receiveEmail()` against in-memory bindings instead.
  */
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -17,5 +18,12 @@ export default defineConfig({
 		environment: "node",
 		include: ["workers/**/*.test.ts"],
 		globals: false,
+		// The agents SDK imports Workers runtime modules that Node cannot load.
+		// Inline it so these aliases apply, letting tests run its real code.
+		alias: {
+			"cloudflare:workers": fileURLToPath(new URL("./test-stubs/cloudflare-runtime.ts", import.meta.url)),
+			"cloudflare:email": fileURLToPath(new URL("./test-stubs/cloudflare-runtime.ts", import.meta.url)),
+		},
+		server: { deps: { inline: ["agents", "partyserver"] } },
 	},
 });

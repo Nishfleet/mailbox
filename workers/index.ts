@@ -28,6 +28,7 @@ import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { buildAttentionSummary } from "./lib/attention";
 import { mapWithConcurrency, withTimeout } from "./lib/async";
+import { triggerAutoDraft } from "./lib/auto-draft-trigger";
 
 type AppContext = Context<MailboxContext>;
 
@@ -571,11 +572,9 @@ async function receiveEmail(
 		return;
 	}
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender, subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	ctx.waitUntil(triggerAutoDraft(env, {
+		mailboxId, emailId: messageId, sender, subject: parsedEmail.subject || "", threadId,
+	}));
 }
 
 export { app, receiveEmail };
