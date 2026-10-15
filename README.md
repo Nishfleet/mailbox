@@ -1,6 +1,6 @@
 # 0509 mailbox
 
-The team mailbox for 0509. It is a copy of Cloudflare's open source [Agentic Inbox](https://github.com/cloudflare/agentic-inbox) (Apache 2.0, see [LICENSE](LICENSE)) running as the Worker `0509-support-inbox`. Email Routing on `0509.io` hands it the alerts, fleet-signup and catch-all addresses, and the team reads them in the web app behind Cloudflare Access.
+The team mailbox for 0509. It is a copy of Cloudflare's open source [Agentic Inbox](https://github.com/cloudflare/agentic-inbox) (Apache 2.0, see [LICENSE](LICENSE)) running as the Worker `0509-support-inbox` (the repo is `0509-mailbox`; the Worker keeps its old name so Email Routing keeps pointing at it). Email Routing on `0509.io` hands it the alerts, fleet-signup and catch-all addresses, and the team reads them in the web app behind Cloudflare Access.
 
 Not to be confused with the support-report Worker in [Nishfleet/0509](https://github.com/Nishfleet/0509) (`workers/support-inbox.ts`, Worker `0509-support-inbox-v2`), which stores `support@0509.io` reports and opens issues. That one is part of the product repo; this repo is only the mailbox app.
 
@@ -31,24 +31,6 @@ The Worker fails closed outside local development unless `POLICY_AUD` and `TEAM_
 - **Backend:** Hono, Cloudflare Workers, Durable Objects (SQLite), R2, Email Routing
 - **AI Agent:** Cloudflare Agents SDK (`AIChatAgent`), AI SDK v6, Workers AI (`@cf/moonshotai/kimi-k2.5`), `react-markdown` + `remark-gfm`
 - **Auth:** Cloudflare Access JWT validation (required outside local development)
-
-## Getting Started
-
-```bash
-npm install
-npm run dev
-```
-
-### Configuration
-
-1. Set your domain in `wrangler.jsonc`
-2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
-
-### Deploy
-
-```bash
-npm run deploy
-```
 
 ## Prerequisites
 
