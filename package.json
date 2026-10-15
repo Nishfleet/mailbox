@@ -97,7 +97,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.62.3",
-		"@cloudflare/workers-types": "^4.20251128.0",
+		"@cloudflare/workers-types": "^5.20261015.1",
 		"@react-router/dev": "7.17.0",
 		"@tailwindcss/vite": "^4.1.4",
 		"@types/dompurify": "^3.0.5",
