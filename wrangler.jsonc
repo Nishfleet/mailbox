@@ -23,7 +23,9 @@
 		"ATTENTION_NOTIFY_BASE_URL": "https://0509-support-inbox.nishant345.workers.dev",
 		"ATTENTION_NOTIFY_MIN_SIGNALS": "1",
 		"ATTENTION_NOTIFY_COOLDOWN_MINUTES": "60",
-		"ATTENTION_NOTIFY_MAX_ACTIONS": "3"
+		"ATTENTION_NOTIFY_MAX_ACTIONS": "3",
+		// Automatic AI reply drafts per mailbox per UTC day; "0" turns auto-drafting off.
+		"AUTO_DRAFT_DAILY_LIMIT": "200"
 	},
 	"send_email": [
 		{

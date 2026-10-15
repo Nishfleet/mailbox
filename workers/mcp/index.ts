@@ -15,9 +15,7 @@ import {
 	toolDraftReply,
 	toolDraftEmail,
 	toolUpdateDraft,
-	toolDeleteEmail,
-	toolSendReply,
-	toolSendEmail,
+	toolTrashEmail,
 	toolMarkEmailRead,
 	toolMoveEmail,
 } from "../lib/tools";
@@ -55,12 +53,21 @@ function mcpResult(result: Record<string, unknown>) {
 	return mcpText(result);
 }
 
+/** Returned by the MCP send tools: they save a draft, they never send. */
+const NOT_SENT_MESSAGE =
+	"Not sent. Saved to the Drafts folder; a person must review and send it from the mailbox app.";
+
 /**
  * EmailMCP — exposes email tools over the Model Context Protocol.
  *
  * Clients (ProtoAgent, Claude Code, Cursor, etc.) connect to the
  * `/mcp` endpoint and can list mailboxes, read/search emails,
- * draft replies, send messages, and manage folders.
+ * draft replies, and manage folders.
+ *
+ * MCP clients cannot send or permanently delete mail: `send_reply` and
+ * `send_email` save a draft for a person to send from the app, and
+ * `delete_email` moves the email to Trash. The tool names are kept so
+ * existing clients keep working.
  */
 export class EmailMCP extends McpAgent<Env> {
 	server = new McpServer({
@@ -309,25 +316,27 @@ export class EmailMCP extends McpAgent<Env> {
 		// ── delete_email ───────────────────────────────────────────
 		this.server.tool(
 			"delete_email",
-			"Permanently delete an email by ID.",
+			"Move an email to Trash by ID. This does not permanently delete it; only a person in the mailbox app can do that.",
 			{
 				mailboxId: z.string().describe("The mailbox email address"),
-				emailId: z.string().describe("The email ID to delete"),
+				emailId: z.string().describe("The email ID to move to Trash"),
 			},
 			async ({ mailboxId, emailId }) => {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
-				const result = await toolDeleteEmail(env, mailboxId, emailId);
+				const result = await toolTrashEmail(env, mailboxId, emailId);
 				return mcpResult(result);
 			},
 		);
 
 		// ── send_reply ─────────────────────────────────────────────
+		// Kept under its old name for existing clients, but it only saves a
+		// draft: a person sends it from the mailbox app.
 		this.server.tool(
 			"send_reply",
-			"Send a reply to an email. Only call after drafting and getting confirmation.",
+			"Save a reply to an email as a draft in the Drafts folder. This does NOT send: a person must review and send it from the mailbox app.",
 			{
-				mailboxId: z.string().describe("The mailbox email address to send from"),
+				mailboxId: z.string().describe("The mailbox email address the reply is from"),
 				originalEmailId: z
 					.string()
 					.describe("The ID of the email being replied to"),
@@ -338,38 +347,32 @@ export class EmailMCP extends McpAgent<Env> {
 			async ({ mailboxId, originalEmailId, to, subject, bodyHtml }) => {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
-				const result = await toolSendReply(env, mailboxId, {
+				const result = await toolDraftReply(env, mailboxId, {
 					originalEmailId,
 					to,
 					subject,
-					bodyHtml,
+					body: bodyHtml,
+					isPlainText: false,
+					runVerifyDraft: true,
 				});
-				if ("error" in result) {
-					// Preserve the original MCP error format for send failures
-					if (typeof result.error === "string" && result.error.startsWith("Failed to send")) {
-						return {
-							content: [{ type: "text" as const, text: result.error }],
-							isError: true,
-						};
-					}
-					if (result.error === "Original email not found") {
-						return {
-							content: [{ type: "text" as const, text: "Original email not found" }],
-							isError: true,
-						};
-					}
-					return mcpResult(result);
-				}
-				return mcpText(result);
+				if ("error" in result) return mcpResult(result);
+				return mcpText({
+					status: "draft_saved",
+					sent: false,
+					draftId: result.draftId,
+					message: NOT_SENT_MESSAGE,
+				});
 			},
 		);
 
 		// ── send_email ─────────────────────────────────────────────
+		// Kept under its old name for existing clients, but it only saves a
+		// draft: a person sends it from the mailbox app.
 		this.server.tool(
 			"send_email",
-			"Send a new email (not a reply). Only call after getting confirmation.",
+			"Save a new email (not a reply) as a draft in the Drafts folder. This does NOT send: a person must review and send it from the mailbox app.",
 			{
-				mailboxId: z.string().describe("The mailbox email address to send from"),
+				mailboxId: z.string().describe("The mailbox email address the email is from"),
 				to: z.string().email().describe("Recipient email address"),
 				subject: z.string().describe("Subject line"),
 				bodyHtml: z.string().describe("The HTML body of the email"),
@@ -377,21 +380,21 @@ export class EmailMCP extends McpAgent<Env> {
 			async ({ mailboxId, to, subject, bodyHtml }) => {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
-				const result = await toolSendEmail(env, mailboxId, {
+				const result = await toolDraftEmail(env, mailboxId, {
 					to,
 					subject,
-					bodyHtml,
+					body: bodyHtml,
+					isPlainText: false,
+					runVerifyDraft: true,
 				});
-				if ("error" in result) {
-					if (typeof result.error === "string" && result.error.startsWith("Failed to send")) {
-						return {
-							content: [{ type: "text" as const, text: result.error }],
-							isError: true,
-						};
-					}
-					return mcpResult(result);
-				}
-				return mcpText(result);
+				if ("error" in result) return mcpResult(result);
+				return mcpText({
+					status: "draft_saved",
+					sent: false,
+					draftId: result.draftId,
+					threadId: result.threadId,
+					message: NOT_SENT_MESSAGE,
+				});
 			},
 		);
 

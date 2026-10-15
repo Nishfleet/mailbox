@@ -22,7 +22,7 @@ The Worker fails closed outside local development unless `POLICY_AUD` and `TEAM_
 - **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
 - **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
 - **Built-in AI agent** — Side panel with 10 email tools for attention summaries, reading, searching, drafting, and sending
-- **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
+- **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending. Spam is skipped, and drafts are capped per mailbox per UTC day by `AUTO_DRAFT_DAILY_LIMIT` (default 200, `0` turns auto-drafting off)
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
 
 ## Stack
@@ -41,6 +41,8 @@ The Worker fails closed outside local development unless `POLICY_AUD` and `TEAM_
 - [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
 
 Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
+
+MCP clients cannot send or permanently delete mail. `send_reply` and `send_email` save a draft that a person sends from the app, and `delete_email` moves the email to Trash.
 
 ## Architecture
 

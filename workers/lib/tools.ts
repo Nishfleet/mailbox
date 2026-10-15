@@ -429,8 +429,38 @@ export async function toolDiscardDraft(
 	return { status: "discarded", draftId };
 }
 
+// ── trash_email ────────────────────────────────────────────────────
+
+/**
+ * Move an email to Trash instead of deleting it. Used by the MCP
+ * `delete_email` tool so a connected AI client can never permanently
+ * delete mail; a person can still empty Trash from the app.
+ */
+export async function toolTrashEmail(
+	env: Env,
+	mailboxId: string,
+	emailId: string,
+) {
+	const stub = getMailboxStub(env, mailboxId);
+	const email = await stub.getEmail(emailId);
+	if (!email) {
+		return { error: "Email not found", emailId };
+	}
+	const moved = await stub.moveEmail(emailId, Folders.TRASH);
+	if (!moved) {
+		return { error: "Failed to move email to trash", emailId };
+	}
+	return {
+		status: "moved_to_trash",
+		emailId,
+		folder: Folders.TRASH,
+		message: "Moved to Trash. Permanent deletion is only available to a person in the mailbox app.",
+	};
+}
+
 // ── delete_email ───────────────────────────────────────────────────
 
+/** Permanent delete. Not exposed over MCP (see toolTrashEmail). */
 export async function toolDeleteEmail(
 	env: Env,
 	mailboxId: string,
@@ -446,6 +476,10 @@ export async function toolDeleteEmail(
 
 // ── send_reply ─────────────────────────────────────────────────────
 
+/**
+ * Sends immediately. Not exposed over MCP: the MCP send tools save a draft
+ * for a person to send from the app instead (see workers/mcp/index.ts).
+ */
 export async function toolSendReply(
 	env: Env,
 	mailboxId: string,
@@ -521,6 +555,7 @@ export async function toolSendReply(
 
 // ── send_email ─────────────────────────────────────────────────────
 
+/** Sends immediately. Not exposed over MCP (see toolSendReply). */
 export async function toolSendEmail(
 	env: Env,
 	mailboxId: string,
