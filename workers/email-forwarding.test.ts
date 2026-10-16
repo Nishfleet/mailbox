@@ -106,6 +106,8 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		// The mail is stored as before, and the forward happens only after the store.
 		expect(createEmail).toHaveBeenCalledTimes(1);
 		expect(order).toEqual(["createEmail", "forward"]);
+		// Normal inbox mail still triggers the auto-draft.
+		expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
 	});
 
 	it("forwards mail that the spam heuristic flags", async () => {
@@ -124,6 +126,8 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		expect(storedFolders).toEqual([Folders.SPAM]);
 		expect(forward).toHaveBeenCalledWith(FORWARD_TO);
 		expect(order).toEqual(["createEmail", "forward"]);
+		// Spam never triggers an AI auto-draft.
+		expect(ctx.waitUntil).not.toHaveBeenCalled();
 	});
 
 	it("does not forward when forwarding is disabled", async () => {

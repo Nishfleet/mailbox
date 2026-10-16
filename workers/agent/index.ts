@@ -32,6 +32,7 @@ import {
 } from "../lib/tools";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
 import type { Env } from "../types";
+import { parseAutoDraftDailyLimit, takeAutoDraftSlot } from "../lib/auto-draft-budget";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
@@ -366,12 +367,34 @@ export class EmailAgent extends AIChatAgent<any> {
 
 		let emailBody = "";
 		let threadContext = "";
+		let email: EmailFull | null = null;
 		try {
-			const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
-			if (email?.internal_owned) {
-				console.log(`Skipping auto-draft for internal owned-domain email ${emailData.emailId}.`);
-				return { status: "skipped_internal_owned_email" };
-			}
+			email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
+		} catch (e) {
+			console.warn("Pre-read failed, agent will use tools:", (e as Error).message);
+		}
+		if (email?.internal_owned) {
+			console.log(`Skipping auto-draft for internal owned-domain email ${emailData.emailId}.`);
+			return { status: "skipped_internal_owned_email" };
+		}
+		if (email?.folder_id === Folders.SPAM) {
+			console.log(`Skipping auto-draft for spam email ${emailData.emailId}.`);
+			return { status: "skipped_spam" };
+		}
+
+		// Daily spend cap: counted before the first AI call (the injection scan).
+		const slot = await takeAutoDraftSlot(
+			this.ctx.storage,
+			parseAutoDraftDailyLimit((env as { AUTO_DRAFT_DAILY_LIMIT?: unknown }).AUTO_DRAFT_DAILY_LIMIT),
+		);
+		if (!slot.allowed) {
+			console.warn(
+				`Auto-draft daily limit reached for ${emailData.mailboxId} (${slot.used}/${slot.limit} on ${slot.day} UTC); skipping draft for ${emailData.emailId} until tomorrow.`,
+			);
+			return { status: "skipped_daily_limit", used: slot.used, limit: slot.limit };
+		}
+
+		try {
 			if (email?.body) {
 				const isInjection = await isPromptInjection(env.AI, email.body);
 				if (isInjection) {
