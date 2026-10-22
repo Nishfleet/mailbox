@@ -1,5 +1,5 @@
 # Weekly dependency watch. One grouped PR per ecosystem, at most two open at a
-# time. The 7-day cooldown holds a fresh release back long enough for a broken
+# time. The 3-day cooldown holds a fresh release back long enough for a broken
 # or malicious publish to be withdrawn before Dependabot proposes it.
 version: 2
 updates:
@@ -11,7 +11,7 @@ updates:
       time: "09:35"
       timezone: Asia/Kolkata
     cooldown:
-      default-days: 7
+      default-days: 3
     open-pull-requests-limit: 2
     groups:
       npm:
@@ -28,7 +28,7 @@ updates:
       time: "09:35"
       timezone: Asia/Kolkata
     cooldown:
-      default-days: 7
+      default-days: 3
     open-pull-requests-limit: 2
     groups:
       github-actions:
