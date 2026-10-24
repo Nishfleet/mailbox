@@ -25,6 +25,39 @@ The Worker fails closed outside local development unless `POLICY_AUD` and `TEAM_
 - **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending. Spam is skipped, and drafts are capped per mailbox per UTC day by `AUTO_DRAFT_DAILY_LIMIT` (default 200, `0` turns auto-drafting off)
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
 
+## Attention notifier (15-minute cron)
+
+`wrangler.jsonc` runs the Worker on the stock Cloudflare cron trigger `*/15 * * * *`. Each tick, the scheduled handler in `workers/app.ts` calls `runAttentionNotificationCheck` (`workers/lib/attention-notifications.ts`), which builds the same attention summary the Attention Desk shows and sends at most one Pushover message when the priority set changes.
+
+- **What sends** — an action in the `money`, `leads` or `act_now` bucket, up to `ATTENTION_NOTIFY_MAX_ACTIONS` of them. The checked set is fingerprinted, so the same set never sends twice no matter how many ticks pass, and a new or changed action sends on the next tick.
+- **State** — `ops/attention-notification-state.json` in the `BUCKET` R2 bucket holds the last sent time, fingerprint, signal and action counts, cron string, delivery method, and the Pushover request id or email message id. Delete the object to forget the last message and let the next tick send again.
+- **Delivery** — the Pushover API when `PUSHOVER_APP_TOKEN` and `PUSHOVER_USER_KEY` are set, otherwise an email through the `EMAIL` binding to `PUSHOVER_EMAIL_ALIAS`. With neither configured the check logs `disabled` and sends nothing.
+
+Settings in `wrangler.jsonc` under `vars`:
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `ATTENTION_NOTIFY_BASE_URL` | `https://0509-support-inbox.nishant345.workers.dev` | Base URL of the "Open Attention Desk" link in the message. |
+| `ATTENTION_NOTIFY_MIN_SIGNALS` | `1` | Minimum total attention signal count before a message can be sent. |
+| `ATTENTION_NOTIFY_COOLDOWN_MINUTES` | `60` | Window used to label the log result `unchanged-cooldown` or `unchanged` when the set did not change. It does not delay a changed set. |
+| `ATTENTION_NOTIFY_MAX_ACTIONS` | `3` | Actions listed in one message. |
+
+Secrets, set with `npx wrangler secret put <NAME>` rather than in `wrangler.jsonc`:
+
+| Secret | Effect |
+| --- | --- |
+| `PUSHOVER_APP_TOKEN` | Pushover application token. With `PUSHOVER_USER_KEY`, selects API delivery. |
+| `PUSHOVER_USER_KEY` | Pushover user key. With `PUSHOVER_APP_TOKEN`, selects API delivery. |
+| `PUSHOVER_EMAIL_ALIAS` | Pushover email alias. Selects email delivery when the API pair is not set. |
+| `ATTENTION_NOTIFY_FROM_EMAIL` | From address for email delivery; defaults to `alerts@0509.io`. |
+
+### Switching it off
+
+1. Remove the `triggers.crons` block from `wrangler.jsonc` and deploy. No scheduled run then happens.
+2. Unset the Pushover settings (`npx wrangler secret delete PUSHOVER_APP_TOKEN`, and the same for `PUSHOVER_USER_KEY` and `PUSHOVER_EMAIL_ALIAS`). Each tick then logs `disabled` and sends nothing.
+
+`workers/attention-notifications.test.ts` covers the send decision and the message format, and CI runs it with `npm test`.
+
 ## Stack
 
 - **Frontend:** React 19, React Router v7, Tailwind CSS, Zustand, TipTap, `@cloudflare/kumo`
