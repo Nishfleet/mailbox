@@ -10,4 +10,5 @@ export interface Env extends Cloudflare.Env {
 	PUSHOVER_USER_KEY?: string;
 	PUSHOVER_EMAIL_ALIAS?: string;
 	ATTENTION_NOTIFY_FROM_EMAIL?: string;
+	SENTRY_DSN?: string;
 }
