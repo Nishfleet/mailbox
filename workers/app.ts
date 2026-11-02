@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { withSentry } from "@sentry/cloudflare";
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet } from "jose";
@@ -108,34 +109,43 @@ app.all("*", (c) => {
 	});
 });
 
-// Export the Hono app as the default export with an email handler
-export default {
-	fetch: app.fetch,
-	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-		ctx.waitUntil(
-			runAttentionNotificationCheck(env, {
-				now: new Date(controller.scheduledTime),
-				cron: controller.cron,
-			})
-				.then((result) => {
-					console.log("Attention notification check finished", result);
+// Export the Hono app as the default export with an email handler.
+// withSentry reports uncaught errors from fetch, scheduled and email to Sentry.
+export default withSentry(
+	(env: Env) => ({
+		dsn: env.SENTRY_DSN,
+		release: env.CF_VERSION_METADATA.id,
+		environment: "production",
+		tracesSampleRate: 0,
+	}),
+	{
+		fetch: app.fetch,
+		async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+			ctx.waitUntil(
+				runAttentionNotificationCheck(env, {
+					now: new Date(controller.scheduledTime),
+					cron: controller.cron,
 				})
-				.catch((error) => {
-					console.error("Attention notification check failed", error);
-				}),
-		);
+					.then((result) => {
+						console.log("Attention notification check finished", result);
+					})
+					.catch((error) => {
+						console.error("Attention notification check failed", error);
+					}),
+			);
+		},
+		async email(event: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
+			try {
+				await receiveEmail(event, env, ctx);
+			} catch (e) {
+				// A failure here means processing failed, not that a mailbox's optional
+				// forwarding address is unreachable — mailbox forwarding failures are
+				// logged inside receiveEmail and never reach this handler.
+				console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
+				// Re-throw so Cloudflare's email routing can retry delivery or bounce the message.
+				// Swallowing the error would silently drop the email.
+				throw e;
+			}
+		},
 	},
-	async email(event: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
-		try {
-			await receiveEmail(event, env, ctx);
-		} catch (e) {
-			// A failure here means processing failed, not that a mailbox's optional
-			// forwarding address is unreachable — mailbox forwarding failures are
-			// logged inside receiveEmail and never reach this handler.
-			console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
-			// Re-throw so Cloudflare's email routing can retry delivery or bounce the message.
-			// Swallowing the error would silently drop the email.
-			throw e;
-		}
-	},
-};
+);
