@@ -17,6 +17,7 @@
 		"@ai-sdk/react": "3.0.203",
 		"@cloudflare/ai-chat": "^0.1.8",
 		"@cloudflare/kumo": "^1.13.0",
+		"@modelcontextprotocol/sdk": "^1.32.2",
 		"@phosphor-icons/react": "^2.1.10",
 		"@sentry/cloudflare": "^11.10.0",
 		"@tanstack/react-query": "^5.99.0",
@@ -80,7 +81,8 @@
 		"@tiptap/extension-ordered-list": "3.20.2",
 		"@tiptap/extension-paragraph": "3.20.2",
 		"@tiptap/extension-strike": "3.20.2",
-		"@tiptap/extension-text": "3.20.2"
+		"@tiptap/extension-text": "3.20.2",
+		"@modelcontextprotocol/sdk": "$@modelcontextprotocol/sdk"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.67.0",
