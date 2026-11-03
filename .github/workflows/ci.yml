@@ -21,6 +21,37 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  preview:
+    # Owner decision 2026-11-01 (fleet-ops#10935): a preview link the owner can
+    # click on every product PR. Cloudflare Workers Previews through the official
+    # action, same shape as rera-report-card; the "View deployment" button on the
+    # PR opens it. Not a required check. Skipped for forks and Dependabot, whose
+    # runs get no Actions secrets (GitHub docs, "Automating Dependabot with GitHub Actions").
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment:
+      name: preview
+      url: ${{ steps.preview.outputs.preview-url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - id: preview
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: preview --name pr-${{ github.event.pull_request.number }}
+
   dependency-review:
     # GitHub's own check: fails a PR that adds a dependency with a known vulnerability.
     if: github.event_name == 'pull_request'
