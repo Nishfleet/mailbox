@@ -5,7 +5,7 @@
 import type { Env } from "../types";
 import { getMailboxStub, listMailboxes } from "./email-helpers";
 
-export const RETENTION_DAYS = 90;
+export const RETENTION_DAYS = 1095;
 export const RETENTION_BATCH_SIZE = 50;
 export const RETENTION_MAX_EMAILS_PER_RUN = 200;
 const R2_DELETE_KEY_LIMIT = 1000;
