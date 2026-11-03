@@ -10,6 +10,7 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import { deleteExpiredEmails, selectExpiredEmails } from "../lib/retention";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -637,6 +638,16 @@ export class MailboxDO extends DurableObject<Env> {
 			.run();
 
 		return emailAttachments;
+	}
+
+	async listExpiredEmails(cutoff: string, limit: number) {
+		return selectExpiredEmails(this.ctx.storage.sql, cutoff, limit);
+	}
+
+	async deleteExpiredEmails(ids: string[], cutoff: string) {
+		return this.ctx.storage.transactionSync(() =>
+			deleteExpiredEmails(this.ctx.storage.sql, ids, cutoff),
+		);
 	}
 
 	async getAttachment(id: string) {
