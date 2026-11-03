@@ -1,9 +1,10 @@
 name: Deploy production
-# Deploys main once its CI run succeeds (GitHub workflow_run), or by hand (fleet-ops#8615).
+# Deploys main on every push, or by hand (fleet-ops#8615). It runs the CI checks on the
+# exact tree it ships, so a red main never deploys. No workflow_run trigger and no
+# Actions cache, because a deploy holds secrets (https://docs.zizmor.sh/audits/#dangerous-triggers,
+# https://docs.zizmor.sh/audits/#cache-poisoning).
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch: {}
 permissions:
@@ -13,20 +14,20 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
-          cache: npm
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
       - run: npm run build
       - run: npx wrangler deploy
         env:
