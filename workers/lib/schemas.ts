@@ -2,53 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-/**
- * Shared types and Zod schemas for email data.
- *
- * Types (from email-types.ts): used by the agent, MCP server, and route
- * handlers to avoid `as any` casting.
- *
- * Zod schemas: used across route handlers to eliminate duplication.
- */
 import { z } from "zod";
-
-// ── TypeScript Interfaces ──────────────────────────────────────────
-
-export interface EmailMetadata {
-	id: string;
-	subject: string;
-	sender: string;
-	recipient: string;
-	cc?: string | null;
-	bcc?: string | null;
-	date: string;
-	read: boolean;
-	starred: boolean;
-	in_reply_to?: string | null;
-	email_references?: string | null;
-	thread_id?: string | null;
-	folder_id?: string | null;
-	internal_owned?: boolean | number | null;
-	snippet?: string | null;
-}
-
-export interface EmailFull extends EmailMetadata {
-	body?: string | null;
-	message_id?: string | null;
-	raw_headers?: string | null;
-	attachments?: AttachmentInfo[];
-}
-
-export interface AttachmentInfo {
-	id: string;
-	filename: string;
-	mimetype: string;
-	size: number;
-	content_id?: string | null;
-	disposition?: string | null;
-}
-
-// ── Zod Schemas ────────────────────────────────────────────────────
 
 const RecipientFieldSchema = z.union([
 	z.string().email(),

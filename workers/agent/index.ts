@@ -11,7 +11,7 @@ import {
 } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
-import type { EmailFull, EmailMetadata } from "../lib/schemas";
+import type { EmailDetail } from "../../shared/email";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
 import {
 	getMailboxStub,
@@ -367,9 +367,9 @@ export class EmailAgent extends AIChatAgent<any> {
 
 		let emailBody = "";
 		let threadContext = "";
-		let email: EmailFull | null = null;
+		let email: EmailDetail | null = null;
 		try {
-			email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
+			email = (await stub.getEmail(emailData.emailId));
 		} catch (e) {
 			console.warn("Pre-read failed, agent will use tools:", (e as Error).message);
 		}
@@ -426,11 +426,11 @@ export class EmailAgent extends AIChatAgent<any> {
 			}
 
 		// Load thread for conversation context
-		const threadEmails = (await stub.getEmails({ thread_id: emailData.threadId })) as EmailMetadata[];
+		const threadEmails = (await stub.getEmails({ thread_id: emailData.threadId }));
 		if (threadEmails.length > 1) {
 			const fullThread = await Promise.all(
 				threadEmails.map(async (e) => {
-					const full = (await stub.getEmail(e.id)) as EmailFull | null;
+					const full = (await stub.getEmail(e.id));
 					const text = full?.body ? stripHtmlToText(full.body) : "";
 					return { id: e.id, sender: e.sender, recipient: e.recipient, subject: e.subject, date: e.date, folder_id: e.folder_id, body_text: text };
 				}),

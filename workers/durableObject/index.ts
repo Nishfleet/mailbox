@@ -8,6 +8,7 @@ import { eq, and, or, asc, desc, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
+import type { EmailAttachment, EmailDetail, EmailSummary, SearchResult, ThreadSummary } from "../../shared/email";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
 
@@ -99,7 +100,7 @@ interface GetEmailsOptions {
 	thread_id?: string;
 	page?: number;
 	limit?: number;
-	sortColumn?: SortColumn;
+	sortColumn?: string;
 	sortDirection?: "ASC" | "DESC";
 }
 
@@ -131,6 +132,50 @@ interface AttachmentData {
 	content_id?: string | null;
 	disposition?: string | null;
 }
+
+type EmailRow = {
+	id: string;
+	folder_id: string;
+	subject: string | null;
+	sender: string | null;
+	recipient: string | null;
+	cc: string | null;
+	bcc: string | null;
+	date: string | null;
+	read: number | null;
+	starred: number | null;
+	body: string | null;
+	in_reply_to: string | null;
+	email_references: string | null;
+	thread_id: string | null;
+	message_id: string | null;
+	raw_headers: string | null;
+	internal_owned: number | null;
+};
+
+type AttachmentRow = {
+	id: string;
+	email_id: string;
+	filename: string;
+	mimetype: string;
+	size: number;
+	content_id: string | null;
+	disposition: string | null;
+};
+
+type SummaryRow = Omit<EmailRow, "body" | "message_id" | "raw_headers" | "internal_owned"> & {
+	snippet: string | null;
+};
+
+type ThreadRow = Omit<SummaryRow, "cc" | "bcc"> & {
+	thread_count: number | null;
+	thread_unread_count: number | null;
+	participants: string | null;
+};
+
+type ConversationRow = ThreadRow & { needs_reply: number; has_draft: number };
+
+type SearchRow = SummaryRow & { folder_name: string | null };
 
 interface AttentionRow {
 	id: string;
@@ -170,6 +215,22 @@ interface AttentionCategoryRow {
 	leadCount: number;
 }
 
+type StoredEmailFields = Pick<EmailRow, "subject" | "sender" | "recipient" | "date" | "read" | "starred">;
+
+type PresentedEmailFields = Pick<EmailSummary, keyof StoredEmailFields>;
+
+function presentEmail<T extends StoredEmailFields>(row: T): Omit<T, keyof StoredEmailFields> & PresentedEmailFields {
+	return {
+		...row,
+		subject: row.subject ?? "",
+		sender: row.sender ?? "",
+		recipient: row.recipient ?? "",
+		date: row.date ?? "",
+		read: !!row.read,
+		starred: !!row.starred,
+	};
+}
+
 function categoryCondition(terms: string[]) {
 	return terms.map(() => `${ATTENTION_SEARCH_TEXT_SQL} LIKE ?`).join(" OR ");
 }
@@ -190,7 +251,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Email CRUD (Drizzle) ───────────────────────────────────────
 
-	async getEmails(options: GetEmailsOptions = {}) {
+	async getEmails(options: GetEmailsOptions = {}): Promise<EmailSummary[]> {
 		const {
 			folder,
 			thread_id,
@@ -203,11 +264,7 @@ export class MailboxDO extends DurableObject<Env> {
 		// Cap pagination limit to prevent unbounded queries
 		const limit = Math.min(Math.max(rawLimit, 1), 100);
 
-		const sortColumn: SortColumn = ALLOWED_SORT_COLUMNS.includes(
-			rawSortColumn as SortColumn,
-		)
-			? rawSortColumn
-			: "date";
+		const sortColumn = ALLOWED_SORT_COLUMNS.find((column) => column === rawSortColumn) ?? "date";
 
 		const offset = (page - 1) * limit;
 
@@ -248,11 +305,7 @@ export class MailboxDO extends DurableObject<Env> {
 			.offset(offset)
 			.all();
 
-		return result.map((email) => ({
-			...email,
-			read: !!email.read,
-			starred: !!email.starred,
-		}));
+		return result.map(presentEmail);
 	}
 
 	/**
@@ -289,7 +342,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Threaded queries (raw SQL — too complex for Drizzle's builder) ──
 
-	async getThreadedEmails(options: GetEmailsOptions = {}) {
+	async getThreadedEmails(options: GetEmailsOptions = {}): Promise<ThreadSummary[] | EmailSummary[]> {
 		const {
 			folder,
 			page = 1,
@@ -316,7 +369,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const isDraftFolder = folder === Folders.DRAFT;
 
 		if (isDraftFolder) {
-			const result = this.ctx.storage.sql.exec(
+			const result = this.ctx.storage.sql.exec<ThreadRow>(
 				`WITH
 				folder_emails AS (
 					SELECT *,
@@ -357,10 +410,8 @@ export class MailboxDO extends DurableObject<Env> {
 			);
 
 			const rows = [...result];
-			return rows.map((row: any) => ({
-				...row,
-				read: !!row.read,
-				starred: !!row.starred,
+			return rows.map((row) => ({
+				...presentEmail(row),
 				thread_count: row.thread_count || 1,
 				thread_unread_count: row.thread_unread_count || 0,
 				participants: row.participants || row.sender,
@@ -368,7 +419,7 @@ export class MailboxDO extends DurableObject<Env> {
 		}
 
 		// Non-draft folders: full threading logic
-		const result = this.ctx.storage.sql.exec(
+		const result = this.ctx.storage.sql.exec<ConversationRow>(
 			`WITH
 			folder_emails AS (
 				SELECT *,
@@ -452,10 +503,8 @@ export class MailboxDO extends DurableObject<Env> {
 		);
 
 		const rows = [...result];
-		return rows.map((row: any) => ({
-			...row,
-			read: !!row.read,
-			starred: !!row.starred,
+		return rows.map((row) => ({
+			...presentEmail(row),
 			thread_count: row.thread_count || 1,
 			thread_unread_count: row.thread_unread_count || 0,
 			participants: row.participants || row.sender,
@@ -515,7 +564,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Single email operations (Drizzle) ──────────────────────────
 
-	async getEmail(id: string) {
+	async getEmail(id: string): Promise<EmailDetail | null> {
 		const email = this.db
 			.select()
 			.from(schema.emails)
@@ -531,9 +580,7 @@ export class MailboxDO extends DurableObject<Env> {
 			.all();
 
 		return {
-			...email,
-			read: !!email.read,
-			starred: !!email.starred,
+			...presentEmail(email),
 			attachments: emailAttachments,
 		};
 	}
@@ -543,29 +590,29 @@ export class MailboxDO extends DurableObject<Env> {
 	 * two queries (one for emails, one for attachments) instead of
 	 * N+1 individual getEmail calls.
 	 */
-	async getThreadEmails(threadId: string) {
+	async getThreadEmails(threadId: string): Promise<EmailDetail[]> {
 		const emailRows = [
-			...this.ctx.storage.sql.exec(
+			...this.ctx.storage.sql.exec<EmailRow>(
 				`SELECT * FROM emails WHERE thread_id = ?1 ORDER BY date ASC`,
 				threadId,
 			),
-		] as any[];
+		];
 
 		if (emailRows.length === 0) return [];
 
-		const emailIds = emailRows.map((e) => e.id as string);
+		const emailIds = emailRows.map((e) => e.id);
 
 		// Batch-fetch all attachments for the thread in a single query
 		const placeholders = emailIds.map((_, i) => `?${i + 1}`).join(",");
 		const attachmentRows = [
-			...this.ctx.storage.sql.exec(
+			...this.ctx.storage.sql.exec<AttachmentRow>(
 				`SELECT * FROM attachments WHERE email_id IN (${placeholders})`,
 				...emailIds,
 			),
-		] as any[];
+		];
 
 		// Group attachments by email_id
-		const attachmentsByEmail = new Map<string, any[]>();
+		const attachmentsByEmail = new Map<string, EmailAttachment[]>();
 		for (const att of attachmentRows) {
 			const list = attachmentsByEmail.get(att.email_id) || [];
 			list.push(att);
@@ -573,9 +620,7 @@ export class MailboxDO extends DurableObject<Env> {
 		}
 
 		return emailRows.map((email) => ({
-			...email,
-			read: !!email.read,
-			starred: !!email.starred,
+			...presentEmail(email),
 			attachments: attachmentsByEmail.get(email.id) || [],
 		}));
 	}
@@ -639,7 +684,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return emailAttachments;
 	}
 
-	async getAttachment(id: string) {
+	async getAttachment(id: string): Promise<EmailAttachment | null> {
 		return (
 			this.db
 				.select()
@@ -1058,7 +1103,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return { conditions, params };
 	}
 
-	async searchEmails(options: SearchFilterOptions & { page?: number; limit?: number }) {
+	async searchEmails(options: SearchFilterOptions & { page?: number; limit?: number }): Promise<SearchResult[]> {
 		const { page = 1, limit: rawLimit = 25 } = options;
 		const limit = Math.min(Math.max(rawLimit, 1), 100);
 		const { conditions, params } = this.#buildSearchConditions(options, "e");
@@ -1078,12 +1123,8 @@ export class MailboxDO extends DurableObject<Env> {
 			ORDER BY e.date DESC LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`;
 		params.push(limit, offset);
 
-		const result = this.ctx.storage.sql.exec(query, ...params);
-		return [...result].map((row: any) => ({
-			...row,
-			read: !!row.read,
-			starred: !!row.starred,
-		}));
+		const result = this.ctx.storage.sql.exec<SearchRow>(query, ...params);
+		return [...result].map(presentEmail);
 	}
 
 	/**
@@ -1111,7 +1152,12 @@ export class MailboxDO extends DurableObject<Env> {
 
 		if (!normalized) return null;
 
-		const result = this.ctx.storage.sql.exec(
+		const result = this.ctx.storage.sql.exec<{
+			thread_id: string;
+			subject: string | null;
+			senders: string | null;
+			recipients: string | null;
+		}>(
 			`SELECT thread_id, subject,
 			        GROUP_CONCAT(DISTINCT LOWER(sender)) as senders,
 			        GROUP_CONCAT(DISTINCT LOWER(recipient)) as recipients
@@ -1127,22 +1173,22 @@ export class MailboxDO extends DurableObject<Env> {
 		const normalizedSender = senderAddress?.toLowerCase().trim();
 
 		for (const row of result) {
-			const rowSubject = String((row as any).subject || "")
+			const rowSubject = (row.subject ?? "")
 				.replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")
 				.trim()
 				.toLowerCase();
 			if (rowSubject !== normalized) continue;
 
 			if (normalizedSender) {
-				const threadSenders = String((row as any).senders || "");
-				const threadRecipients = String((row as any).recipients || "");
+				const threadSenders = row.senders ?? "";
+				const threadRecipients = row.recipients ?? "";
 				const allParticipants = `${threadSenders},${threadRecipients}`;
 				if (!allParticipants.includes(normalizedSender)) {
 					continue;
 				}
 			}
 
-			return String((row as any).thread_id);
+			return row.thread_id;
 		}
 		return null;
 	}

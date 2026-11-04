@@ -42,20 +42,12 @@
       "count": 5
     }
   },
-  "workers/durableObject/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 10
-    }
-  },
   "workers/email-sender.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
   "workers/index.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    },
     "no-control-regex": {
       "count": 2
     },

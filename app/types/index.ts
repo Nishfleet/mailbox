@@ -2,6 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import type { EmailAttachment, EmailDetail, EmailSummary, ThreadSummary } from "../../shared/email";
+
 export interface SignatureSettings {
 	enabled: boolean;
 	text: string;
@@ -117,41 +119,11 @@ export interface AttentionSummary {
 	warnings: string[];
 }
 
-export interface Email {
-	id: string;
-	thread_id?: string | null;
-	folder_id?: string | null;
-	subject: string;
-	sender: string;
-	recipient: string;
-	cc?: string;
-	bcc?: string;
-	date: string;
-	read: boolean;
-	starred: boolean;
-	body?: string | null;
-	in_reply_to?: string | null;
-	email_references?: string | null;
-	message_id?: string | null;
-	raw_headers?: string | null;
-	attachments?: Attachment[];
-	snippet?: string | null;
-	// Thread aggregate fields (only present in threaded list view)
-	thread_count?: number;
-	thread_unread_count?: number;
-	participants?: string;
-	needs_reply?: boolean;
-	has_draft?: boolean;
-}
+export type Attachment = EmailAttachment;
 
-export interface Attachment {
-	id: string;
-	filename: string;
-	mimetype: string;
-	size: number;
-	content_id?: string;
-	disposition?: string;
-}
+export type Email = Pick<EmailSummary, "id" | "subject" | "sender" | "recipient" | "date" | "read" | "starred">
+	& Partial<Omit<EmailDetail, "attachments"> & Omit<ThreadSummary, "read" | "starred">>
+	& { attachments?: EmailAttachment[] };
 
 export interface Folder {
 	id: string;
