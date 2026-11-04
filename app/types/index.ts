@@ -4,19 +4,8 @@
 
 import type { EmailAttachment, EmailDetail, EmailSummary, ThreadSummary } from "../../shared/email";
 
-export interface SignatureSettings {
-	enabled: boolean;
-	text: string;
-	html?: string;
-}
-
-export interface MailboxSettings {
-	fromName?: string;
-	forwarding?: { enabled: boolean; email: string; spam?: boolean; internal?: boolean };
-	signature?: SignatureSettings;
-	autoReply?: { enabled: boolean; subject: string; message: string };
-	agentSystemPrompt?: string;
-}
+export type { MailboxSettings, SignatureSettings } from "../../shared/mailbox-settings";
+import type { MailboxSettings } from "../../shared/mailbox-settings";
 
 export interface Mailbox {
 	id: string;

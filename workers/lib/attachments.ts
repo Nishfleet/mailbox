@@ -18,9 +18,21 @@ export interface StoredAttachment {
 	disposition: string;
 }
 
-/**
- * Store base64-encoded attachments to R2 and return metadata for the DO.
- */
+const UNSAFE_KEY_CHARS = /[/\\:*?"<>|\x00-\x1f]/g;
+
+export function safeFilename(filename: string | null | undefined): string {
+	return (filename || "untitled").replace(UNSAFE_KEY_CHARS, "_");
+}
+
+export function attachmentKey(attachment: Pick<StoredAttachment, "email_id" | "id" | "filename">): string {
+	return `attachments/${attachment.email_id}/${attachment.id}/${attachment.filename}`;
+}
+
+export function contentDisposition(filename: string): string {
+	const quoted = filename.replace(/[\x00-\x1f"\\]/g, "_");
+	return `attachment; filename="${quoted}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 export async function storeAttachments(
 	bucket: Env["BUCKET"],
 	emailId: string,
@@ -37,16 +49,15 @@ export async function storeAttachments(
 	const results: StoredAttachment[] = [];
 	for (const att of attachments) {
 		const attachmentId = crypto.randomUUID();
-		// Sanitize filename to prevent path traversal in R2 keys
-		const safeFilename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
-		const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
+		const filename = safeFilename(att.filename);
+		const key = attachmentKey({ email_id: emailId, id: attachmentId, filename });
 		const binaryStr = atob(att.content);
 		const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
 		await bucket.put(key, bytes);
 		results.push({
 			id: attachmentId,
 			email_id: emailId,
-			filename: safeFilename,
+			filename,
 			mimetype: att.type,
 			size: bytes.byteLength,
 			content_id: att.contentId || null,
