@@ -11,7 +11,6 @@ import {
 } from "./attention-notification-core.js";
 
 const STATE_KEY = "ops/attention-notification-state.json";
-const DEFAULT_BASE_URL = "https://0509-support-inbox.nishant345.workers.dev";
 const DEFAULT_FROM_EMAIL = "alerts@0509.io";
 const PUSHOVER_MESSAGES_URL = "https://api.pushover.net/1/messages.json";
 
@@ -149,7 +148,7 @@ export async function runAttentionNotificationCheck(
 	]);
 	const decision = shouldSendAttentionNotification(summary, state, {
 		now,
-		baseUrl: env.ATTENTION_NOTIFY_BASE_URL || DEFAULT_BASE_URL,
+		baseUrl: env.ATTENTION_NOTIFY_BASE_URL,
 		minSignals: parsePositiveInteger(env.ATTENTION_NOTIFY_MIN_SIGNALS, 1),
 		cooldownMinutes: parsePositiveInteger(
 			env.ATTENTION_NOTIFY_COOLDOWN_MINUTES,

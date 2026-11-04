@@ -18,7 +18,7 @@ interface NotificationSummary {
 
 interface NotificationOptions {
 	maxActions?: number;
-	baseUrl?: string;
+	baseUrl: string;
 	notifyBuckets?: Set<string>;
 	minSignals?: number;
 	cooldownMinutes?: number;
@@ -40,7 +40,6 @@ interface AttentionNotification {
 const DEFAULT_MAX_ACTIONS = 3;
 const DEFAULT_MIN_SIGNALS = 1;
 const DEFAULT_COOLDOWN_MINUTES = 60;
-const DEFAULT_BASE_URL = "https://0509-support-inbox.nishant345.workers.dev";
 const DEFAULT_NOTIFY_BUCKETS = new Set(["money", "leads", "act_now"]);
 const MAX_MESSAGE_LENGTH = 900;
 
@@ -64,17 +63,12 @@ function truncate(value: unknown, maxLength: number) {
 	return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
 }
 
-function normalizeBaseUrl(value: unknown) {
-	const raw = normalizeText(value) || DEFAULT_BASE_URL;
-	try {
-		const url = new URL(raw);
-		url.pathname = url.pathname.replace(/\/+$/, "");
-		url.search = "";
-		url.hash = "";
-		return url.toString().replace(/\/$/, "");
-	} catch {
-		return DEFAULT_BASE_URL;
-	}
+function normalizeBaseUrl(value: string) {
+	const url = new URL(normalizeText(value));
+	url.pathname = url.pathname.replace(/\/+$/, "");
+	url.search = "";
+	url.hash = "";
+	return url.toString().replace(/\/$/, "");
 }
 
 function hashString(value: string) {
@@ -137,7 +131,7 @@ function notificationActions(
 
 export function buildAttentionNotification(
 	summary: NotificationSummary,
-	options: NotificationOptions = {},
+	options: NotificationOptions,
 ) {
 	const maxActions = positiveInteger(options.maxActions, DEFAULT_MAX_ACTIONS);
 	const baseUrl = normalizeBaseUrl(options.baseUrl);
@@ -174,7 +168,7 @@ export function buildAttentionNotificationEmail(notification: AttentionNotificat
 export function shouldSendAttentionNotification(
 	summary: NotificationSummary,
 	state: NotificationState = {},
-	options: NotificationOptions = {},
+	options: NotificationOptions,
 ) {
 	const minSignals = positiveInteger(options.minSignals, DEFAULT_MIN_SIGNALS);
 	const cooldownMinutes = positiveInteger(

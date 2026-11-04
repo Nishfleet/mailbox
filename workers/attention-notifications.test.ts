@@ -55,6 +55,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 
 	const firstDecision = shouldSendAttentionNotification(summary, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -67,6 +68,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T04:30:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -79,6 +81,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -94,6 +97,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -111,6 +115,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -125,6 +130,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		notificationActions: [],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -139,6 +145,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		notificationActions: [],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -194,6 +201,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 	};
 	const draftCrowdedDecision = shouldSendAttentionNotification(draftCrowdedSummary, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -220,6 +228,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		}],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -243,6 +252,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		}],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
