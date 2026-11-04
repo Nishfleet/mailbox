@@ -2,14 +2,33 @@
   "app/components/AgentPanel.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 5
+    },
+    "no-comments/disallowComments": {
+      "count": 5
+    }
+  },
+  "app/components/AgentSidebar.tsx": {
+    "no-comments/disallowComments": {
+      "count": 2
+    }
+  },
+  "app/components/ComposePanel.tsx": {
+    "no-comments/disallowComments": {
+      "count": 1
     }
   },
   "app/components/EmailIframe.tsx": {
+    "no-comments/disallowComments": {
+      "count": 9
+    },
     "no-useless-escape": {
       "count": 1
     }
   },
   "app/components/EmailPanel.tsx": {
+    "no-comments/disallowComments": {
+      "count": 2
+    },
     "no-empty": {
       "count": 1
     },
@@ -17,8 +36,31 @@
       "count": 1
     }
   },
+  "app/components/Header.tsx": {
+    "no-comments/disallowComments": {
+      "count": 4
+    }
+  },
   "app/components/MCPPanel.tsx": {
     "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "no-comments/disallowComments": {
+      "count": 5
+    }
+  },
+  "app/components/RichTextEditor.tsx": {
+    "no-comments/disallowComments": {
+      "count": 7
+    }
+  },
+  "app/components/Sidebar.tsx": {
+    "no-comments/disallowComments": {
+      "count": 8
+    }
+  },
+  "app/components/email-panel/EmailPanelDialogs.tsx": {
+    "no-comments/disallowComments": {
       "count": 1
     }
   },
@@ -30,6 +72,9 @@
   "app/entry.server.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
+    },
+    "no-comments/disallowComments": {
+      "count": 5
     }
   },
   "app/hooks/useComposeForm.ts": {
@@ -37,18 +82,200 @@
       "count": 1
     }
   },
+  "app/hooks/useUIStore.ts": {
+    "no-comments/disallowComments": {
+      "count": 7
+    }
+  },
+  "app/lib/search-parser.ts": {
+    "no-comments/disallowComments": {
+      "count": 9
+    },
+    "no-inline-comments": {
+      "count": 1
+    }
+  },
+  "app/lib/utils.ts": {
+    "no-comments/disallowComments": {
+      "count": 22
+    }
+  },
+  "app/queries/emails.ts": {
+    "no-comments/disallowComments": {
+      "count": 17
+    }
+  },
+  "app/queries/keys.ts": {
+    "no-comments/disallowComments": {
+      "count": 1
+    }
+  },
+  "app/root.tsx": {
+    "no-comments/disallowComments": {
+      "count": 9
+    }
+  },
+  "app/routes/email-list.tsx": {
+    "no-comments/disallowComments": {
+      "count": 9
+    }
+  },
+  "app/routes/home.tsx": {
+    "no-comments/disallowComments": {
+      "count": 5
+    },
+    "no-inline-comments": {
+      "count": 1
+    }
+  },
+  "app/routes/mailbox.tsx": {
+    "no-comments/disallowComments": {
+      "count": 5
+    }
+  },
+  "app/routes/search-results.tsx": {
+    "no-comments/disallowComments": {
+      "count": 2
+    }
+  },
+  "app/routes/settings.tsx": {
+    "no-comments/disallowComments": {
+      "count": 5
+    }
+  },
+  "app/services/api.ts": {
+    "no-comments/disallowComments": {
+      "count": 9
+    }
+  },
+  "shared/dates.ts": {
+    "no-comments/disallowComments": {
+      "count": 6
+    }
+  },
+  "shared/folders.ts": {
+    "no-comments/disallowComments": {
+      "count": 6
+    }
+  },
   "workers/agent/index.ts": {
     "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    },
+    "no-comments/disallowComments": {
+      "count": 30
+    }
+  },
+  "workers/app.ts": {
+    "no-comments/disallowComments": {
+      "count": 18
+    }
+  },
+  "workers/auto-draft-budget.test.ts": {
+    "no-comments/disallowComments": {
+      "count": 6
+    }
+  },
+  "workers/durableObject/index.ts": {
+    "no-comments/disallowComments": {
+      "count": 33
+    }
+  },
+  "workers/durableObject/migrations.ts": {
+    "no-comments/disallowComments": {
+      "count": 11
+    }
+  },
+  "workers/email-forwarding.test.ts": {
+    "no-comments/disallowComments": {
       "count": 5
     }
   },
   "workers/email-sender.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
+    },
+    "no-comments/disallowComments": {
+      "count": 3
+    },
+    "no-inline-comments": {
+      "count": 1
+    }
+  },
+  "workers/index.ts": {
+    "no-comments/disallowComments": {
+      "count": 33
+    },
+    "no-inline-comments": {
+      "count": 5
+    },
+    "no-warning-comments": {
+      "count": 1
     }
   },
   "workers/lib/ai.ts": {
     "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "no-comments/disallowComments": {
+      "count": 20
+    }
+  },
+  "workers/lib/async.ts": {
+    "no-comments/disallowComments": {
+      "count": 1
+    }
+  },
+  "workers/lib/attachments.ts": {
+    "no-comments/disallowComments": {
+      "count": 1
+    }
+  },
+  "workers/lib/auto-draft-budget.ts": {
+    "no-comments/disallowComments": {
+      "count": 5
+    }
+  },
+  "workers/lib/auto-draft-trigger.ts": {
+    "no-comments/disallowComments": {
+      "count": 3
+    }
+  },
+  "workers/lib/email-helpers.ts": {
+    "no-comments/disallowComments": {
+      "count": 32
+    }
+  },
+  "workers/lib/mailbox.ts": {
+    "no-comments/disallowComments": {
+      "count": 2
+    }
+  },
+  "workers/lib/schemas.ts": {
+    "no-comments/disallowComments": {
+      "count": 1
+    },
+    "no-inline-comments": {
+      "count": 1
+    }
+  },
+  "workers/lib/tools.ts": {
+    "no-comments/disallowComments": {
+      "count": 32
+    }
+  },
+  "workers/mcp-safety.test.ts": {
+    "no-comments/disallowComments": {
+      "count": 4
+    }
+  },
+  "workers/mcp/index.ts": {
+    "no-comments/disallowComments": {
+      "count": 25
+    }
+  },
+  "workers/test-stubs/cloudflare-runtime.ts": {
+    "no-comments/disallowComments": {
       "count": 1
     }
   }
