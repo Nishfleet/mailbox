@@ -120,7 +120,6 @@ export function isTrustedInternalOwnedEmail(
 
 /**
  * Resolve a MailboxDO stub from a mailbox email address.
- * Replaces the repeated 3-line ns.idFromName / ns.get pattern.
  */
 export function getMailboxStub(
 	env: Env,
