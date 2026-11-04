@@ -36,12 +36,6 @@ function logTriggerFailure(
 /**
  * Ask the mailbox's EmailAgent to draft a reply to a newly stored email.
  *
- * The stub must come from getAgentByName, not a raw
- * `EMAIL_AGENT.get(idFromName(...))`: the agents SDK only accepts requests
- * once the Durable Object knows its name, and getAgentByName is what sends
- * that name (the x-partykit-room header). A raw stub gets HTTP 500 "Missing
- * namespace or room headers" on every email (#17).
- *
  * Never throws. A rejected call or a non-2xx response is written as one
  * structured error log line, so a failure is visible without breaking intake.
  */
