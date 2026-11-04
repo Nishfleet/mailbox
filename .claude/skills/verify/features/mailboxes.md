@@ -34,3 +34,4 @@ Preconditions:
 - The list route `GET /api/v1/mailboxes` returns `name` equal to the address, not the name you created. The display name lives in `settings.fromName`.
 - Delete removes only the R2 entry. The mailbox's emails stay in its Durable Object.
 - Unknown settings keys are dropped on save.
+- The settings PUT replaces the whole settings object. After the Settings step, a read shows only `fromName` and `agentSystemPrompt`, and the default `forwarding`, `signature` and `autoReply` are gone.

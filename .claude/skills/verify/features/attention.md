@@ -17,7 +17,7 @@ The attention desk shows, across all mailboxes, what needs a person: urgent mail
 
 Preconditions:
 
-- `support@0509.io` exists and has received `Refund please` (`inbound-store`).
+- `support@0509.io` exists and has received `Refund please` (`inbound-store`), and the email is unread. After the inbox-list recipe marks it read, PUT `{"read":false}` to it first, because `act_now` counts only unread mail.
 
 - **Buckets.** Run `curl -s $B/api/v1/attention`. `unavailableMailboxCount` is 0. The `act_now` and `money` buckets each have count 1, and `aging` is 0.
 - **Empty.** On a baseline instance with no mailboxes, every bucket count is 0.

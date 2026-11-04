@@ -8,7 +8,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - The data dir (`.wrangler/state`) starts empty. There are no mailboxes until a recipe creates one.
 - `EMAIL_ADDRESSES` is `[]` in `wrangler.jsonc`, so any address on a configured domain can be a mailbox.
 - Never drive an instance that this run did not start.
-- The "bad body gives 400" steps need body validation on every JSON route (PR #123). On an older tree those routes return 500 or store the bad body. Report that as a failure, not a skip.
+- Every JSON route validates its body with `zValidator` (PR #123). A bad body gets status 400 and a body `{"success":false,"error":{"name":"ZodError",...}}`. A 500, or a 2xx that stores the bad body, is a failure, not a skip.
 
 ## Driving conventions
 
