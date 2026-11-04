@@ -9,7 +9,7 @@
  * threading, HTML utilities, and tool-logic (getFullEmail / getFullThread).
  */
 import type { MailboxDO } from "../durableObject";
-import type { EmailFull } from "./schemas";
+import type { EmailDetail } from "../../shared/email";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { formatQuotedDate } from "../../shared/dates";
@@ -120,7 +120,6 @@ export function isTrustedInternalOwnedEmail(
 
 /**
  * Resolve a MailboxDO stub from a mailbox email address.
- * Replaces the repeated 3-line ns.idFromName / ns.get pattern.
  */
 export function getMailboxStub(
 	env: Env,
@@ -221,7 +220,7 @@ export function generateMessageId(fromDomain: string): {
 /**
  * Build the References chain and In-Reply-To from an original email.
  */
-export function buildReferencesChain(original: EmailFull): {
+export function buildReferencesChain(original: EmailDetail): {
 	originalMsgId: string;
 	references: string[];
 	threadId: string;
@@ -263,10 +262,10 @@ export function buildThreadingHeaders(
  */
 export async function resolveOriginalEmail(
 	stub: DurableObjectStub<MailboxDO>,
-	email: EmailFull,
-): Promise<EmailFull> {
+	email: EmailDetail,
+): Promise<EmailDetail> {
 	if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
-		const realOriginal = (await stub.getEmail(email.in_reply_to)) as EmailFull | null;
+		const realOriginal = (await stub.getEmail(email.in_reply_to));
 		if (realOriginal) return realOriginal;
 	}
 	return email;
@@ -347,7 +346,7 @@ export function buildQuotedReplyBlock(original: {
 // ── Tool Logic (getFullEmail / getFullThread) ──────────────────────
 
 type MailboxThreadReaderStub = {
-	getThreadEmails: (threadId: string) => Promise<EmailFull[]>;
+	getThreadEmails: (threadId: string) => Promise<EmailDetail[]>;
 };
 
 /**
@@ -358,7 +357,7 @@ export async function getFullEmail(
 	stub: DurableObjectStub<MailboxDO>,
 	emailId: string,
 ) {
-	const email = (await stub.getEmail(emailId)) as EmailFull | null;
+	const email = (await stub.getEmail(emailId));
 	if (!email) return null;
 
 	const textBody = email.body ? stripHtmlToText(email.body) : "";

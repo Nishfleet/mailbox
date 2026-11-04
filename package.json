@@ -18,6 +18,7 @@
 		"@ai-sdk/react": "3.0.216",
 		"@cloudflare/ai-chat": "^0.1.8",
 		"@cloudflare/kumo": "^1.13.0",
+		"@hono/zod-validator": "^0.9.1",
 		"@modelcontextprotocol/sdk": "^1.32.2",
 		"@phosphor-icons/react": "^2.1.10",
 		"@sentry/cloudflare": "^11.10.0",
@@ -87,6 +88,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.67.0",
+		"@cloudflare/vitest-plugin": "^1.5.1",
 		"@cloudflare/workers-types": "^5.20261101.1",
 		"@eslint/js": "^10.0.1",
 		"@react-router/dev": "7.18.2",
