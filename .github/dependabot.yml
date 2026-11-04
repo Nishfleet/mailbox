@@ -1,6 +1,7 @@
 # Weekly dependency watch. One grouped PR per ecosystem, at most two open at a
-# time. The 3-day cooldown holds a fresh release back long enough for a broken
-# or malicious publish to be withdrawn before Dependabot proposes it.
+# time. Upstream releases are taken 3 days after publish, per the owner's
+# 2026-10-22 standing rule; the window is update latency, not a
+# malicious-publish quarantine.
 version: 2
 updates:
   - package-ecosystem: npm
