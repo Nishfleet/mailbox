@@ -14,12 +14,11 @@ export default defineConfig({
 			{
 				plugins: [
 					cloudflareTest({
-						main: "./workers/agent/index.ts",
-						miniflare: {
-							compatibilityDate: "2025-11-28",
-							compatibilityFlags: ["nodejs_compat"],
-							durableObjects: { EMAIL_AGENT: { className: "EmailAgent", useSQLite: true } },
-						},
+						wrangler: { configPath: "./wrangler.jsonc" },
+						remoteBindings: false,
+						// "0" is the app's own auto-draft off switch: onNewEmail runs and returns
+						// before any Workers AI call, which has no local version.
+						miniflare: { bindings: { AUTO_DRAFT_DAILY_LIMIT: "0" } },
 					}),
 				],
 				test: { name: "workers-runtime", include: [runtimeTests] },
