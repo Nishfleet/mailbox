@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { describe, expect, it, vi } from "vitest";
-import { receiveEmail, type IncomingEmailEvent } from "./index";
+import { applyMailboxForwarding, receiveEmail, type IncomingEmailEvent } from "./index";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 
@@ -186,5 +186,62 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 			expect.anything(),
 		);
 		errorSpy.mockRestore();
+	});
+});
+
+describe("forwarding opt-outs per kind of mail (#15)", () => {
+	it("does not forward spam when forwarding.spam is false, and still stores it", async () => {
+		const forward = vi.fn(async () => undefined);
+		const { env, ctx, event, storedFolders } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO, spam: false } },
+			forward,
+		);
+		event.headers = new Headers({ "x-cf-spamh-score": "7" });
+
+		await receiveEmail(event, env, ctx);
+
+		expect(storedFolders).toEqual([Folders.SPAM]);
+		expect(forward).not.toHaveBeenCalled();
+	});
+
+	it("still forwards normal mail when both opt-outs are set", async () => {
+		const forward = vi.fn(async () => undefined);
+		const { env, ctx, event } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO, spam: false, internal: false } },
+			forward,
+		);
+
+		await receiveEmail(event, env, ctx);
+
+		expect(forward).toHaveBeenCalledWith(FORWARD_TO);
+	});
+
+	it.each([
+		[{}, true],
+		[{ internal: true }, true],
+		[{ internal: false }, false],
+	])("internal owned-domain mail with %j forwards: %s", async (optOut, forwards) => {
+		const forward = vi.fn(async () => undefined);
+		const { env, event } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO, ...optOut } },
+			forward,
+		);
+
+		await applyMailboxForwarding(env, MAILBOX_ID, event, { spam: false, internalOwned: true });
+
+		expect(forward).toHaveBeenCalledTimes(forwards ? 1 : 0);
+	});
+
+	it("never rethrows a failed forward for an opted-in kind", async () => {
+		const { env, event } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO, spam: true } },
+			async () => Promise.reject(new Error("forward failed")),
+		);
+		vi.spyOn(console, "error").mockImplementation(() => {});
+
+		await expect(
+			applyMailboxForwarding(env, MAILBOX_ID, event, { spam: true, internalOwned: false }),
+		).resolves.toBeUndefined();
+		vi.mocked(console.error).mockRestore();
 	});
 });

@@ -436,20 +436,25 @@ type IncomingEmailEvent = {
 
 /** Mailbox settings shape (defaults set in the POST /api/v1/mailboxes handler). */
 type MailboxForwardingSettings = {
-	forwarding?: { enabled?: boolean; email?: string };
+	forwarding?: { enabled?: boolean; email?: string; spam?: boolean; internal?: boolean };
 };
 
+type ForwardingRule = { target: string; spam: boolean; internal: boolean };
+
+type InboundMailKind = { spam: boolean; internalOwned: boolean };
+
 /**
- * Read the forwarding target for a mailbox, or null when it should not forward.
+ * Read the forwarding rule for a mailbox, or null when it should not forward.
  * Never throws: a malformed or unreadable settings object means "do not forward".
  */
-async function getForwardingTarget(env: Env, mailboxId: string): Promise<string | null> {
+async function getForwardingRule(env: Env, mailboxId: string): Promise<ForwardingRule | null> {
 	try {
 		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 		if (!obj) return null;
-		const settings = (await obj.json()) as MailboxForwardingSettings;
-		const target = settings?.forwarding?.email?.trim() ?? "";
-		return settings?.forwarding?.enabled && target ? target : null;
+		const forwarding = ((await obj.json()) as MailboxForwardingSettings)?.forwarding;
+		const target = forwarding?.email?.trim() ?? "";
+		if (!forwarding?.enabled || !target) return null;
+		return { target, spam: forwarding.spam !== false, internal: forwarding.internal !== false };
 	} catch (e) {
 		console.error(`Failed to read forwarding settings for ${mailboxId}:`, (e as Error).message);
 		return null;
@@ -469,10 +474,14 @@ async function applyMailboxForwarding(
 	env: Env,
 	mailboxId: string,
 	event: IncomingEmailEvent,
+	kind: InboundMailKind,
 ) {
-	const target = await getForwardingTarget(env, mailboxId);
-	if (!target) return;
+	const rule = await getForwardingRule(env, mailboxId);
+	if (!rule) return;
+	if (kind.spam && !rule.spam) return;
+	if (kind.internalOwned && !rule.internal) return;
 	if (typeof event.forward !== "function") return;
+	const { target } = rule;
 	try {
 		await event.forward(target);
 		console.log(`Forwarded email for ${mailboxId} to ${target}`);
@@ -561,7 +570,10 @@ async function receiveEmail(
 	// disappear. A failed forward is logged and swallowed inside
 	// applyMailboxForwarding, so it can never lose the stored copy and never
 	// rethrows into the caller's retry-on-error semantics.
-	await applyMailboxForwarding(env, mailboxId, event);
+	await applyMailboxForwarding(env, mailboxId, event, {
+		spam: isSpam,
+		internalOwned: isInternalOwnedNotification,
+	});
 
 	if (isInternalOwnedNotification) {
 		console.log(`Stored internal owned-domain email for ${mailboxId} without auto-drafting.`);
@@ -578,4 +590,4 @@ async function receiveEmail(
 }
 
 export { app, receiveEmail };
-export { getForwardingTarget, applyMailboxForwarding, type IncomingEmailEvent };
+export { getForwardingRule, applyMailboxForwarding, type IncomingEmailEvent };
