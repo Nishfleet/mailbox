@@ -81,12 +81,7 @@ function makeEnv() {
 	const env = {
 		BUCKET: { head: vi.fn(async () => ({})) },
 		MAILBOX: { idFromName: (name: string) => name, get: () => stub },
-		// verifyDraft asks the model to proofread; echo the draft back unchanged.
-		AI: {
-			run: vi.fn(async (_model: string, input: { messages: { role: string; content: string }[] }) => ({
-				response: input.messages[input.messages.length - 1].content,
-			})),
-		},
+		AI: { run: vi.fn(async () => ({ response: "NONE" })) },
 		EMAIL: { send: vi.fn(async () => {}) },
 		DOMAINS: "0509.io",
 	} as unknown as Env;
