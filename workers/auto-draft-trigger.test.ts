@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { receiveEmail, type IncomingEmailEvent } from "./index";
 import { AUTO_DRAFT_TRIGGER_FAILED } from "./lib/auto-draft-trigger";
 import type { Env } from "./types";
@@ -98,7 +98,7 @@ async function deliver(agentNamespace: unknown) {
 	await Promise.all(waits);
 }
 
-function failureLines(spy: ReturnType<typeof vi.spyOn>) {
+function failureLines(spy: MockInstance<typeof console.error>) {
 	return spy.mock.calls
 		.map((args) => {
 			try { return JSON.parse(String(args[0])); } catch { return null; }

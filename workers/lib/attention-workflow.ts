@@ -2,6 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import type { AgentDeskSummary, AttentionItem, AttentionNextAction } from "./attention";
+
 const WORKFLOW_BUCKET_PRIORITY = Object.freeze({
 	drafts_ready: 0,
 	money: 1,
@@ -64,19 +66,19 @@ const AGENT_DESK_RULES = Object.freeze([
 	},
 ]);
 
-function sortItemsByDateDesc(a, b) {
+function sortItemsByDateDesc(a: AttentionItem, b: AttentionItem) {
 	return new Date(b.date).getTime() - new Date(a.date).getTime();
 }
 
-function sortItemsByWorkflowPriority(a, b) {
+function sortItemsByWorkflowPriority(a: AttentionItem, b: AttentionItem) {
 	const priorityDelta =
 		WORKFLOW_BUCKET_PRIORITY[a.bucket] - WORKFLOW_BUCKET_PRIORITY[b.bucket];
 	return priorityDelta || sortItemsByDateDesc(a, b);
 }
 
-export function buildAttentionNextActions(items, limit = 3) {
-	const seen = new Set();
-	const actions = [];
+export function buildAttentionNextActions(items: AttentionItem[], limit = 3): AttentionNextAction[] {
+	const seen = new Set<string>();
+	const actions: AttentionNextAction[] = [];
 
 	for (const item of [...items].sort(sortItemsByWorkflowPriority)) {
 		const conversationId = item.threadId || item.emailId;
@@ -103,7 +105,7 @@ export function buildAttentionNextActions(items, limit = 3) {
 	return actions;
 }
 
-function deskSearchText(item) {
+function deskSearchText(item: AttentionItem) {
 	return [
 		item.mailboxId,
 		item.sender,
@@ -115,11 +117,11 @@ function deskSearchText(item) {
 		.join(" ");
 }
 
-function itemMatchesDesk(item, desk) {
+function itemMatchesDesk(item: AttentionItem, desk: (typeof AGENT_DESK_RULES)[number]) {
 	return desk.buckets.includes(item.bucket) || desk.pattern.test(deskSearchText(item));
 }
 
-export function buildAgentDeskSummaries(items, actionLimit = 3) {
+export function buildAgentDeskSummaries(items: AttentionItem[], actionLimit = 3): AgentDeskSummary[] {
 	return AGENT_DESK_RULES.map((desk) => {
 		const deskItems = items.filter((item) => itemMatchesDesk(item, desk));
 		const mailboxIds = [...new Set(deskItems.map((item) => item.mailboxId))].sort(

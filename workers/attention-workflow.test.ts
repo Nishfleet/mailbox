@@ -5,13 +5,16 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import trace from "./fixtures/attention-workflow-trace.json";
+import type { AttentionItem } from "./lib/attention";
 import {
 	buildAgentDeskSummaries,
 	buildAttentionNextActions,
 } from "./lib/attention-workflow.js";
 
+const items = trace.input as AttentionItem[];
+
 test("next actions and agent desks match the recorded trace", () => {
-	const actions = buildAttentionNextActions(trace.input);
+	const actions = buildAttentionNextActions(items);
 	const comparable = actions.map((action) => ({
 		id: action.id,
 		bucket: action.bucket,
@@ -28,7 +31,7 @@ test("next actions and agent desks match the recorded trace", () => {
 	);
 	assert.equal(actions.some((action) => action.bucket === "act_now" && action.threadId === "thread-money"), false);
 
-	const desks = buildAgentDeskSummaries(trace.input);
+	const desks = buildAgentDeskSummaries(items);
 	const comparableDesks = desks.map((desk) => ({
 		id: desk.id,
 		label: desk.label,
