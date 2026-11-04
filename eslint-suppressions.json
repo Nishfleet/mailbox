@@ -203,7 +203,7 @@
   },
   "workers/auto-draft-trigger.test.ts": {
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 2
