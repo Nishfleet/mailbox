@@ -156,10 +156,18 @@ describe("mailbox routes", () => {
 	});
 
 	it("fails the list when the mailbox directory cannot be read", async () => {
-		const { request, bucket } = makeHarness();
-		bucket.list.mockRejectedValueOnce(new Error("R2 down"));
-		const res = await request("/api/v1/mailboxes");
-		expect(res.status).toBe(500);
+		vi.useFakeTimers();
+		try {
+			const { request, bucket } = makeHarness();
+			bucket.list.mockReturnValueOnce(new Promise(() => {}));
+			vi.spyOn(console, "warn").mockImplementationOnce(() => {});
+			const pending = request("/api/v1/mailboxes");
+			await vi.runOnlyPendingTimersAsync();
+			const res = await pending;
+			expect(res.status).toBe(503);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("builds the attention summary", async () => {
