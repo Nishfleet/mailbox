@@ -12,7 +12,9 @@ import {
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import type { EmailFull, EmailMetadata } from "../lib/schemas";
-import { verifyDraft, isPromptInjection } from "../lib/ai";
+import { AI_GATEWAY, verifyDraft, isPromptInjection } from "../lib/ai";
+
+export const INJECTION_CLEAN_PREFIX = "injection-clean:";
 import {
 	getMailboxStub,
 	stripHtmlToText,
@@ -297,7 +299,7 @@ export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools = createEmailTools(env, mailboxId, {
 			includeAttentionSummary: true,
 		});
@@ -345,6 +347,14 @@ export class EmailAgent extends AIChatAgent<any> {
 		return super.onRequest(request);
 	}
 
+	private async isInjectionOnce(env: Env, emailId: string, body: string | null | undefined): Promise<boolean> {
+		const key = `${INJECTION_CLEAN_PREFIX}${emailId}`;
+		if (await this.ctx.storage.get(key)) return false;
+		const injection = await isPromptInjection(env.AI, body);
+		if (!injection) await this.ctx.storage.put(key, true);
+		return injection;
+	}
+
 	/**
 	 * Called when a new email arrives. Reads it, loads the thread,
 	 * drafts a response, and saves it to the Drafts folder.
@@ -357,7 +367,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
 
@@ -396,7 +406,7 @@ export class EmailAgent extends AIChatAgent<any> {
 
 		try {
 			if (email?.body) {
-				const isInjection = await isPromptInjection(env.AI, email.body);
+				const isInjection = await this.isInjectionOnce(env, emailData.emailId, email.body);
 				if (isInjection) {
 					console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
 					
@@ -432,7 +442,8 @@ export class EmailAgent extends AIChatAgent<any> {
 				threadEmails.map(async (e) => {
 					const full = (await stub.getEmail(e.id)) as EmailFull | null;
 					const text = full?.body ? stripHtmlToText(full.body) : "";
-					return { id: e.id, sender: e.sender, recipient: e.recipient, subject: e.subject, date: e.date, folder_id: e.folder_id, body_text: text };
+					const injection = await this.isInjectionOnce(env, e.id, full?.body);
+					return { id: e.id, sender: e.sender, recipient: e.recipient, subject: e.subject, date: e.date, folder_id: e.folder_id, body_text: text, injection };
 				}),
 			);
 			fullThread.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -440,32 +451,26 @@ export class EmailAgent extends AIChatAgent<any> {
 				.map((e) => `[${e.date}] ${e.sender} → ${e.recipient} (${e.folder_id}): ${e.body_text.substring(0, 500)}`)
 				.join("\n\n");
 
-			// Scan thread context for prompt injection too -- an attacker
-			// could plant an injection in an earlier email in the thread
-			// that gets included in the agent's prompt.
-			if (threadContext) {
-				const threadInjection = await isPromptInjection(env.AI, threadContext);
-				if (threadInjection) {
-					console.warn("Skipping auto-draft due to prompt injection in thread context:", emailData.threadId);
-					const newMessages = [
-						{
-							id: crypto.randomUUID(),
-							role: "user" as const,
-							content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
-						},
-						{
-							id: crypto.randomUUID(),
-							role: "assistant" as const,
-							content: "Blocked auto-draft creation: the thread context appears to contain prompt injection or malicious instructions.",
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: "Blocked auto-draft creation: the thread context appears to contain prompt injection or malicious instructions." }],
-						},
-					];
-					await this.persistMessages([...this.messages, ...newMessages]);
-					return;
-				}
+			if (fullThread.some((e) => e.injection)) {
+				console.warn("Skipping auto-draft due to prompt injection in thread context:", emailData.threadId);
+				const newMessages = [
+					{
+						id: crypto.randomUUID(),
+						role: "user" as const,
+						content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
+						createdAt: new Date(),
+						parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
+					},
+					{
+						id: crypto.randomUUID(),
+						role: "assistant" as const,
+						content: "Blocked auto-draft creation: the thread context appears to contain prompt injection or malicious instructions.",
+						createdAt: new Date(),
+						parts: [{ type: "text" as const, text: "Blocked auto-draft creation: the thread context appears to contain prompt injection or malicious instructions." }],
+					},
+				];
+				await this.persistMessages([...this.messages, ...newMessages]);
+				return;
 			}
 		}
 		} catch (e) {
