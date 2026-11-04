@@ -5,7 +5,6 @@
 import type { Context } from "hono";
 import { sendEmail } from "../email-sender";
 import { storeAttachments } from "../lib/attachments";
-import type { EmailFull } from "../lib/schemas";
 import {
 	validateSender,
 	SenderValidationError,
@@ -30,7 +29,7 @@ export async function handleReplyEmail(c: AppContext) {
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
-	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+	const rawOriginal = (await stub.getEmail(id));
 
 	if (!rawOriginal) {
 		return c.json({ error: "Original email not found" }, 404);
@@ -124,7 +123,7 @@ export async function handleForwardEmail(c: AppContext) {
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
-	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+	const rawOriginal = (await stub.getEmail(id));
 
 	if (!rawOriginal) {
 		return c.json({ error: "Original email not found" }, 404);

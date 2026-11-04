@@ -214,13 +214,13 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const threaded = boolQuery(c, "threaded");
 	const page = intQuery(c, "page");
 	const limit = intQuery(c, "limit");
-	const sortColumn = c.req.query("sortColumn") as any;
+	const sortColumn = c.req.query("sortColumn");
 	const sortDirection = c.req.query("sortDirection") as "ASC" | "DESC" | undefined;
 	const stub = c.var.mailboxStub;
 
 	if (threaded && folder) {
-		const emails = await (stub as any).getThreadedEmails({ folder, page, limit });
-		const totalCount = await (stub as any).countThreadedEmails(folder);
+		const emails = await stub.getThreadedEmails({ folder, page, limit });
+		const totalCount = await stub.countThreadedEmails(folder);
 		return c.json({ emails, totalCount });
 	}
 	const emails = await stub.getEmails({ folder, thread_id, page, limit, sortColumn, sortDirection });
@@ -249,7 +249,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 	const stub = c.var.mailboxStub;
-	const rateLimitError = await (stub as any).checkSendRateLimit();
+	const rateLimitError = await stub.checkSendRateLimit();
 	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
@@ -317,7 +317,7 @@ app.delete("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
 	const id = c.req.param("id")!;
 	const attachments = await c.var.mailboxStub.deleteEmail(id);
 	if (attachments === null) return c.json({ error: "Not found" }, 404);
-	if (attachments.length > 0) await c.env.BUCKET.delete(attachments.map((att: any) => `attachments/${id}/${att.id}/${att.filename}`));
+	if (attachments.length > 0) await c.env.BUCKET.delete(attachments.map((att) => `attachments/${id}/${att.id}/${att.filename}`));
 	return c.body(null, 204);
 });
 
@@ -330,7 +330,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
-	return c.json(await (c.var.mailboxStub as any).getThreadEmails(c.req.param("threadId")!));
+	return c.json(await c.var.mailboxStub.getThreadEmails(c.req.param("threadId")!));
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/threads/:threadId/read", async (c: AppContext) => {
@@ -369,13 +369,13 @@ app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => 
 // -- Search ---------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
-	const searchOpts: Record<string, unknown> = {
+	const searchOpts = {
 		query: c.req.query("query") || "", folder: c.req.query("folder"), from: c.req.query("from"),
 		to: c.req.query("to"), subject: c.req.query("subject"), date_start: c.req.query("date_start"),
 		date_end: c.req.query("date_end"), is_read: boolQuery(c, "is_read"),
 		is_starred: boolQuery(c, "is_starred"), has_attachment: boolQuery(c, "has_attachment"),
 	};
-	const stub = c.var.mailboxStub as any;
+	const stub = c.var.mailboxStub;
 	const emails = await stub.searchEmails({ ...searchOpts, page: intQuery(c, "page"), limit: intQuery(c, "limit") });
 	const totalCount = await stub.countSearchResults(searchOpts);
 	return c.json({ emails, totalCount });
@@ -542,7 +542,7 @@ async function receiveEmail(
 	let threadId = emailReferences[0] || inReplyTo || messageId;
 
 	if (!inReplyTo && emailReferences.length === 0) {
-		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
+		const subjectThread = await stub.findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
 		if (subjectThread) threadId = subjectThread;
 	}
 
