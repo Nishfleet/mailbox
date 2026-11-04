@@ -485,3 +485,33 @@ describe("search and attachment routes", () => {
 		expect(res.status).toBe(404);
 	});
 });
+
+describe("request body validation", () => {
+	const badBodies: [string, string, string, unknown][] = [
+		["create mailbox", "POST", "/api/v1/mailboxes", { email: "not-an-email", name: "X" }],
+		["update settings", "PUT", BASE, { settings: { forwarding: "yes" } }],
+		["send email", "POST", `${BASE}/emails`, { to: "customer@example.com" }],
+		["save draft", "POST", `${BASE}/drafts`, { to: "customer@example.com" }],
+		["update email", "PUT", `${BASE}/emails/email-1`, { read: "yes" }],
+		["move email", "POST", `${BASE}/emails/email-1/move`, {}],
+		["create folder", "POST", `${BASE}/folders`, { name: 42 }],
+		["rename folder", "PUT", `${BASE}/folders/custom`, {}],
+		["reply", "POST", `${BASE}/emails/email-1/reply`, { to: "customer@example.com" }],
+		["forward", "POST", `${BASE}/emails/email-1/forward`, { to: "customer@example.com" }],
+	];
+
+	it.each(badBodies)("refuses a bad %s body with 400", async (_name, method, path, body) => {
+		const { json, bucket, stub } = makeHarness();
+		const res = await json(path, method, body);
+		expect(res.status).toBe(400);
+		expect(bucket.put).not.toHaveBeenCalled();
+		expect(stub.createEmail).not.toHaveBeenCalled();
+	});
+
+	it("stores only known settings keys", async () => {
+		const { json, bucket } = makeHarness();
+		const res = await json(BASE, "PUT", { settings: { fromName: "Hello team", injected: "x" } });
+		expect(res.status).toBe(200);
+		expect(bucket.put).toHaveBeenCalledWith(MAILBOX_KEY, JSON.stringify({ fromName: "Hello team" }));
+	});
+});
