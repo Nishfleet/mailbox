@@ -1,7 +1,25 @@
 // https://typescript-eslint.io/getting-started/typed-linting
 import eslint from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
+import noComments from "eslint-plugin-no-comments";
 import tseslint from "typescript-eslint";
+
+const WORKAROUND_TERMS = [
+	"todo",
+	"fixme",
+	"xxx",
+	"hack",
+	"workaround",
+	"work around",
+	"for now",
+	"temporary",
+	"temporarily",
+	"not ideal",
+	"should be",
+	"ideally",
+	"revisit",
+	"later",
+];
 
 const rawStub = {
 	selector: "CallExpression[callee.property.name='idFromName']",
@@ -51,6 +69,31 @@ export default defineConfig(
 			"no-restricted-imports": ["error", {
 				patterns: [{ group: ["**/workers", "**/workers/**"], message: "The app imports shared types from shared/, never from workers/." }],
 			}],
+		},
+	},
+	{
+		files: ["app/**/*.{ts,tsx}", "shared/**/*.ts", "workers/**/*.ts"],
+		ignores: ["**/*.config.ts"],
+		plugins: { "no-comments": noComments },
+		rules: {
+			"no-comments/disallowComments": [
+				"error",
+				{
+					allow: [
+						"eslint",
+						"global",
+						"@ts-",
+						"\\* @",
+						"/\\s*<reference",
+						"upstream: https://",
+						"Copyright \\(c\\) \\d{4} Cloudflare, Inc\\.$",
+						"Licensed under the Apache 2\\.0 license found in the LICENSE file or at:$",
+						"\\s*https://opensource\\.org/licenses/Apache-2\\.0$",
+					],
+				},
+			],
+			"no-inline-comments": ["error", { ignorePattern: "@type" }],
+			"no-warning-comments": ["error", { terms: WORKAROUND_TERMS, location: "anywhere" }],
 		},
 	},
 );
