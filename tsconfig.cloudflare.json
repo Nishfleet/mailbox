@@ -13,7 +13,7 @@
     "composite": true,
     "strict": true,
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "types": ["vite/client", "@cloudflare/workers-types/experimental"],
+    "types": ["vite/client", "@cloudflare/workers-types/experimental", "@cloudflare/vitest-plugin/types"],
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
@@ -23,7 +23,6 @@
     "paths": {
       "~/*": ["./app/*"]
     },
-    "noImplicitAny": false,
     "esModuleInterop": true,
     "resolveJsonModule": true
   }

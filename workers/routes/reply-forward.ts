@@ -2,10 +2,10 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Context } from "hono";
+import { createFactory } from "hono/factory";
+import { zValidator } from "@hono/zod-validator";
 import { sendEmail } from "../email-sender";
 import { storeAttachments } from "../lib/attachments";
-import type { EmailFull } from "../lib/schemas";
 import {
 	validateSender,
 	SenderValidationError,
@@ -20,17 +20,16 @@ import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
 
-type AppContext = Context<MailboxContext>;
-type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
+const factory = createFactory<MailboxContext>();
 
-export async function handleReplyEmail(c: AppContext) {
+export const handleReplyEmail = factory.createHandlers(zValidator("json", SendEmailRequestSchema), async (c) => {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
-	const body = SendEmailRequestSchema.parse(await c.req.json());
+	const body = c.req.valid("json");
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
-	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+	const rawOriginal = (await stub.getEmail(id));
 
 	if (!rawOriginal) {
 		return c.json({ error: "Original email not found" }, 404);
@@ -52,8 +51,7 @@ export async function handleReplyEmail(c: AppContext) {
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-	const rateLimitError = await (stub as unknown as RateLimitStub)
-		.checkSendRateLimit();
+	const rateLimitError = await stub.checkSendRateLimit();
 	if (rateLimitError) {
 		return c.json({ error: rateLimitError }, 429);
 	}
@@ -115,16 +113,16 @@ export async function handleReplyEmail(c: AppContext) {
 	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);
-}
+});
 
-export async function handleForwardEmail(c: AppContext) {
+export const handleForwardEmail = factory.createHandlers(zValidator("json", SendEmailRequestSchema), async (c) => {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
-	const body = SendEmailRequestSchema.parse(await c.req.json());
+	const body = c.req.valid("json");
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
-	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+	const rawOriginal = (await stub.getEmail(id));
 
 	if (!rawOriginal) {
 		return c.json({ error: "Original email not found" }, 404);
@@ -145,8 +143,7 @@ export async function handleForwardEmail(c: AppContext) {
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-	const rateLimitError = await (stub as unknown as RateLimitStub)
-		.checkSendRateLimit();
+	const rateLimitError = await stub.checkSendRateLimit();
 	if (rateLimitError) {
 		return c.json({ error: rateLimitError }, 429);
 	}
@@ -203,4 +200,4 @@ export async function handleForwardEmail(c: AppContext) {
 	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);
-}
+});

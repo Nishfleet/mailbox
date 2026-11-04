@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import trace from "./fixtures/attention-workflow-trace.json";
+import type { AttentionItem } from "./lib/attention";
 import {
 	buildAttentionNotificationEmail,
 	buildAttentionNotification,
@@ -16,6 +17,8 @@ import {
 	parseCloudflareSpamScore,
 } from "./lib/spam.js";
 
+const items = trace.input as AttentionItem[];
+
 test("notifications send only on changed priority signals, and spam scoring", () => {
 	const now = new Date("2026-07-02T04:00:00.000Z");
 	const summary = {
@@ -24,9 +27,9 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		mailboxCount: 3,
 		unavailableMailboxCount: 0,
 		attentionSignalCount: trace.input.length,
-		nextActions: buildAttentionNextActions(trace.input),
+		nextActions: buildAttentionNextActions(items),
 		notificationActions: buildAttentionNextActions(
-			trace.input.filter((item) => ["money", "leads", "act_now"].includes(item.bucket)),
+			items.filter((item) => ["money", "leads", "act_now"].includes(item.bucket)),
 			12,
 		),
 	};
@@ -52,6 +55,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 
 	const firstDecision = shouldSendAttentionNotification(summary, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -64,6 +68,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T04:30:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -76,6 +81,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -91,6 +97,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -108,6 +115,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		lastFingerprint: notification.fingerprint,
 	}, {
 		now: new Date("2026-07-02T05:05:00.000Z"),
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -122,6 +130,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		notificationActions: [],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -136,6 +145,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		notificationActions: [],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -143,7 +153,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 	assert.equal(draftOnlyDecision.shouldSend, false);
 	assert.equal(draftOnlyDecision.reason, "empty");
 
-	const draftCrowdedSummary = {
+	const draftCrowdedSummary: Parameters<typeof shouldSendAttentionNotification>[0] = {
 		...summary,
 		attentionSignalCount: 4,
 		nextActions: [
@@ -191,6 +201,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 	};
 	const draftCrowdedDecision = shouldSendAttentionNotification(draftCrowdedSummary, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -217,6 +228,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		}],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
@@ -240,6 +252,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		}],
 	}, {}, {
 		now,
+		baseUrl: "https://inbox.example.com",
 		minSignals: 1,
 		cooldownMinutes: 60,
 		maxActions: 3,
