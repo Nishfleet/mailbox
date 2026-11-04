@@ -27,7 +27,7 @@ it("reaches the real EmailAgent with its name set, and logs its non-2xx answer w
 		.filter((line) => line.includes(AUTO_DRAFT_TRIGGER_FAILED));
 	expect(failures.join("\n")).not.toContain("Missing namespace or room headers");
 	expect(failures).toHaveLength(1);
-	const line = JSON.parse(failures[0]);
+	const line: unknown = JSON.parse(failures[0]);
 	expect(line).toMatchObject({ event: AUTO_DRAFT_TRIGGER_FAILED, mailboxId: MAILBOX_ID, status: 500 });
 	expect(failures[0]).not.toContain("sender@example.com");
 	expect(failures[0]).not.toContain("pricing");
