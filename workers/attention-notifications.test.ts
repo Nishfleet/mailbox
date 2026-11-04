@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import trace from "./fixtures/attention-workflow-trace.json";
+import type { AttentionItem } from "./lib/attention";
 import {
 	buildAttentionNotificationEmail,
 	buildAttentionNotification,
@@ -16,6 +17,8 @@ import {
 	parseCloudflareSpamScore,
 } from "./lib/spam.js";
 
+const items = trace.input as AttentionItem[];
+
 test("notifications send only on changed priority signals, and spam scoring", () => {
 	const now = new Date("2026-07-02T04:00:00.000Z");
 	const summary = {
@@ -24,9 +27,9 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 		mailboxCount: 3,
 		unavailableMailboxCount: 0,
 		attentionSignalCount: trace.input.length,
-		nextActions: buildAttentionNextActions(trace.input),
+		nextActions: buildAttentionNextActions(items),
 		notificationActions: buildAttentionNextActions(
-			trace.input.filter((item) => ["money", "leads", "act_now"].includes(item.bucket)),
+			items.filter((item) => ["money", "leads", "act_now"].includes(item.bucket)),
 			12,
 		),
 	};
@@ -143,7 +146,7 @@ test("notifications send only on changed priority signals, and spam scoring", ()
 	assert.equal(draftOnlyDecision.shouldSend, false);
 	assert.equal(draftOnlyDecision.reason, "empty");
 
-	const draftCrowdedSummary = {
+	const draftCrowdedSummary: Parameters<typeof shouldSendAttentionNotification>[0] = {
 		...summary,
 		attentionSignalCount: 4,
 		nextActions: [

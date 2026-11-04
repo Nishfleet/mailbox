@@ -5,9 +5,12 @@
 export const CLOUDFLARE_SPAM_SCORE_HEADER = "x-cf-spamh-score";
 export const HIGH_CONFIDENCE_SPAM_SCORE = 5;
 
-function headerValue(headers, name) {
+type HeaderEntry = { key?: string; value?: string } | null | undefined;
+type HeaderSource = Pick<Headers, "get"> | Iterable<HeaderEntry> | null | undefined;
+
+function headerValue(headers: HeaderSource, name: string): string | null {
 	if (!headers) return null;
-	if (typeof headers.get === "function") return headers.get(name);
+	if ("get" in headers) return headers.get(name);
 
 	const target = name.toLowerCase();
 	for (const header of headers) {
@@ -17,7 +20,7 @@ function headerValue(headers, name) {
 	return null;
 }
 
-export function parseCloudflareSpamScore(headers) {
+export function parseCloudflareSpamScore(headers: HeaderSource): number | null {
 	const raw = headerValue(headers, CLOUDFLARE_SPAM_SCORE_HEADER);
 	if (raw === null || raw === "") return null;
 	const score = Number.parseFloat(String(raw).trim());
@@ -25,7 +28,7 @@ export function parseCloudflareSpamScore(headers) {
 }
 
 export function isHighConfidenceSpam(
-	headers,
+	headers: HeaderSource,
 	threshold = HIGH_CONFIDENCE_SPAM_SCORE,
 ) {
 	const score = parseCloudflareSpamScore(headers);
