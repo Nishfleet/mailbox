@@ -81,7 +81,7 @@ describe("auto-draft trigger on incoming mail (#17)", () => {
 		const errors = vi.spyOn(console, "error").mockImplementation(() => {});
 		const namespace = {
 			idFromName: (name: string) => name,
-			get: () => ({ fetch: async () => { throw new Error("Durable Object reset"); } }),
+			get: () => ({ __unsafe_ensureInitialized: async () => { throw new Error("Durable Object reset"); } }),
 		};
 
 		await expect(deliver(namespace)).resolves.toBeUndefined();
