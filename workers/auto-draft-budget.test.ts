@@ -90,7 +90,7 @@ vi.mock("@cloudflare/ai-chat", () => ({
 		}
 	},
 }));
-vi.mock("workers-ai-provider", () => ({ createWorkersAI: () => () => ({}) }));
+vi.mock("agents/models/ai-sdk", () => ({ createAI: () => () => ({}) }));
 vi.mock("ai", async (importOriginal) => ({
 	...(await importOriginal<typeof import("ai")>()),
 	generateText: (...args: unknown[]) => generateText(...(args as [])),

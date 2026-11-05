@@ -15,11 +15,13 @@
 		"lint": "eslint ."
 	},
 	"dependencies": {
-		"@ai-sdk/react": "3.0.216",
-		"@cloudflare/ai-chat": "^0.1.8",
+		"@ai-sdk/provider": "^4.0.36",
+		"@ai-sdk/react": "4.0.167",
+		"@cloudflare/ai-chat": "^0.12.2",
 		"@cloudflare/kumo": "^1.13.0",
 		"@hono/zod-validator": "^0.9.1",
 		"@modelcontextprotocol/sdk": "^1.32.2",
+		"@modelcontextprotocol/server": "2.4.0",
 		"@phosphor-icons/react": "^2.1.10",
 		"@sentry/cloudflare": "^11.10.0",
 		"@tanstack/react-query": "^5.105.0",
@@ -32,8 +34,8 @@
 		"@tiptap/extension-underline": "3.32.2",
 		"@tiptap/react": "3.32.2",
 		"@tiptap/starter-kit": "3.32.2",
-		"agents": "^0.7.6",
-		"ai": "6.0.214",
+		"agents": "^0.33.0",
+		"ai": "7.0.163",
 		"dompurify": "^3.4.17",
 		"drizzle-orm": "^0.45.4",
 		"hono": "^4.13.16",
@@ -45,8 +47,7 @@
 		"react-markdown": "^10.1.0",
 		"react-router": "7.18.2",
 		"remark-gfm": "^4.0.1",
-		"workers-ai-provider": "^3.1.2",
-		"zod": "^3.25.76",
+		"zod": "^4.6.7",
 		"zustand": "^5.0.16"
 	},
 	"overrides": {
@@ -57,9 +58,6 @@
 		"@vitest/snapshot": "4.1.12",
 		"@vitest/spy": "4.1.12",
 		"@vitest/utils": "4.1.12",
-		"@cloudflare/kumo": {
-			"zod": "$zod"
-		},
 		"@tiptap/core": "3.32.2",
 		"@tiptap/pm": "3.32.2",
 		"@tiptap/extensions": "3.32.2",
@@ -83,8 +81,7 @@
 		"@tiptap/extension-ordered-list": "3.32.2",
 		"@tiptap/extension-paragraph": "3.32.2",
 		"@tiptap/extension-strike": "3.32.2",
-		"@tiptap/extension-text": "3.32.2",
-		"@modelcontextprotocol/sdk": "$@modelcontextprotocol/sdk"
+		"@tiptap/extension-text": "3.32.2"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.67.0",

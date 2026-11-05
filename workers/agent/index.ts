@@ -7,9 +7,11 @@ import {
 	streamText,
 	generateText,
 	convertToModelMessages,
-	stepCountIs,
+	isStepCount,
+	toUIMessageStream,
+	createUIMessageStreamResponse,
 } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
+import { createAI } from "agents/models/ai-sdk";
 import { z } from "zod";
 import type { EmailDetail } from "../../shared/email";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
@@ -297,7 +299,7 @@ export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createAI({ binding: env.AI });
 		const tools = createEmailTools(env, mailboxId, {
 			includeAttentionSummary: true,
 		});
@@ -305,14 +307,16 @@ export class EmailAgent extends AIChatAgent<any> {
 
 		const result = streamText({
 			model: workersai("@cf/moonshotai/kimi-k2.5"),
-			system: systemPrompt,
+			instructions: systemPrompt,
 			messages: await convertToModelMessages(this.messages),
 			tools,
-			stopWhen: stepCountIs(5),
+			stopWhen: isStepCount(5),
 			onFinish,
 		});
 
-		return result.toUIMessageStreamResponse();
+		return createUIMessageStreamResponse({
+			stream: toUIMessageStream({ stream: result.stream }),
+		});
 	}
 
 	/**
@@ -357,7 +361,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createAI({ binding: env.AI });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
 
@@ -513,10 +517,10 @@ Based on the email content and thread context above, draft a reply using draft_r
 		try {
 			const result = await generateText({
 				model: workersai("@cf/moonshotai/kimi-k2.5"),
-				system: systemPrompt,
+				instructions: systemPrompt,
 				messages: await convertToModelMessages(messages),
 				tools,
-				stopWhen: stepCountIs(5),
+				stopWhen: isStepCount(5),
 			});
 
 			// Check if draft_reply was called (saves to Drafts as side effect).
