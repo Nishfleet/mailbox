@@ -11,6 +11,7 @@ export class DurableObject {
 	constructor(public ctx?: unknown, public env?: unknown) {}
 }
 export class WorkflowEntrypoint {}
+export class RpcTarget {}
 export class EmailMessage {
 	constructor(public from: string, public to: string, public raw: unknown) {}
 }
