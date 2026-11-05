@@ -30,6 +30,7 @@ export const emails = sqliteTable("emails", {
 	message_id: text("message_id"),
 	raw_headers: text("raw_headers"),
 	internal_owned: integer("internal_owned").default(0),
+	injection_checked: integer("injection_checked").default(0),
 });
 
 export const attachments = sqliteTable("attachments", {

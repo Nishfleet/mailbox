@@ -325,7 +325,7 @@
       "count": 3
     },
     "@typescript-eslint/require-await": {
-      "count": 19
+      "count": 20
     },
     "no-comments/disallowComments": {
       "count": 33
@@ -395,7 +395,7 @@
       "count": 1
     },
     "no-comments/disallowComments": {
-      "count": 20
+      "count": 9
     }
   },
   "workers/lib/async.ts": {

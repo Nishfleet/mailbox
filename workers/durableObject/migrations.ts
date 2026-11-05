@@ -172,4 +172,8 @@ export const mailboxMigrations: Migration[] = [
 		name: "9_add_internal_owned",
 		sql: txn(`ALTER TABLE emails ADD COLUMN internal_owned INTEGER DEFAULT 0;`),
 	},
+	{
+		name: "10_add_injection_checked",
+		sql: txn(`ALTER TABLE emails ADD COLUMN injection_checked INTEGER NOT NULL DEFAULT 0;`),
+	},
 ];
