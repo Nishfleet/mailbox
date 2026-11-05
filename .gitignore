@@ -1,5 +1,6 @@
 node_modules/
 build/
+.cloudflare/
 .wrangler/
 .react-router/
 *.tsbuildinfo
