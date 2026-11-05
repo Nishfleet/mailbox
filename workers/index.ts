@@ -62,6 +62,7 @@ const DraftBody = z.object({
 });
 
 const MAILBOX_COUNT_TIMEOUT_MS = 5000;
+const MAILBOX_NAME_TIMEOUT_MS = 5000;
 const MAILBOX_COUNT_CONCURRENCY = 6;
 const MAILBOX_LIST_BUDGET_MS = 12000;
 const MAILBOX_COUNT_START_BUFFER_MS = 500;
@@ -85,6 +86,29 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	const v = c.req.query(key);
 	if (v === undefined || v === "") return undefined;
 	return v === "true" || v === "1";
+}
+
+function mailboxDisplayName(mailboxId: string, fromName: unknown): string {
+	return typeof fromName === "string" && fromName.length > 0 ? fromName : mailboxId;
+}
+
+async function getMailboxName(env: Env, mailboxId: string, timeoutMs: number): Promise<string> {
+	try {
+		const name = await withTimeout(
+			(async () => {
+				const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+				if (!obj) return mailboxId;
+				const settings = await obj.json<{ fromName?: string }>();
+				return mailboxDisplayName(mailboxId, settings?.fromName);
+			})(),
+			timeoutMs,
+			() => console.warn(`Timed out loading display name for ${mailboxId}`),
+		);
+		return name ?? mailboxId;
+	} catch (error) {
+		console.error(`Failed to load display name for ${mailboxId}`, error);
+		return mailboxId;
+	}
 }
 
 async function getInboxUnreadCount(
@@ -153,10 +177,19 @@ app.get("/api/v1/mailboxes", async (c) => {
 		allMailboxes,
 		MAILBOX_COUNT_CONCURRENCY,
 		async (m) => {
+			const nameBudgetMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
+			const name =
+				nameBudgetMs > 0
+					? await getMailboxName(
+							c.env,
+							m.id,
+							Math.min(MAILBOX_NAME_TIMEOUT_MS, nameBudgetMs),
+						)
+					: m.id;
 			const remainingMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
 			return {
 				...m,
-				name: m.id,
+				name,
 				unreadInboxCount:
 					remainingMs > 0
 						? await getInboxUnreadCount(
@@ -196,7 +229,13 @@ app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const obj = await c.env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 	if (!obj) return c.json({ error: "Not found" }, 404);
-	return c.json({ id: mailboxId, name: mailboxId, email: mailboxId, settings: await obj.json() });
+	const settings = await obj.json<{ fromName?: string }>();
+	return c.json({
+		id: mailboxId,
+		name: mailboxDisplayName(mailboxId, settings?.fromName),
+		email: mailboxId,
+		settings,
+	});
 });
 
 app.put("/api/v1/mailboxes/:mailboxId", zValidator("json", UpdateMailboxBody), async (c) => {
