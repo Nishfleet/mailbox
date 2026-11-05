@@ -101,17 +101,39 @@ const { EmailAgent } = await import("./agent/index");
 
 const MAILBOX_ID = "support@0509.io";
 
-function makeAgent(opts: { limit?: string; folder?: string } = {}) {
+type TestEmail = {
+	id: string;
+	folder_id: string;
+	body: string;
+	internal_owned: boolean;
+	injection_checked?: number;
+};
+
+function makeAgent(
+	opts: {
+		limit?: string;
+		folder?: string;
+		emailId?: string;
+		thread?: TestEmail[];
+	} = {},
+) {
 	const storage = memoryStorage();
-	const email = {
+	const email: TestEmail = {
 		id: "e1",
 		folder_id: opts.folder ?? Folders.INBOX,
 		body: "<p>Hello, I have a question about my order.</p>",
 		internal_owned: false,
 	};
+	const emails = new Map<string, TestEmail>([[email.id, email]]);
+	for (const item of opts.thread ?? []) emails.set(item.id, item);
+	const thread = opts.thread ?? [email];
 	const stub = {
-		getEmail: vi.fn(async () => email),
-		getEmails: vi.fn(async () => [email]),
+		getEmail: vi.fn(async (id: string) => emails.get(id) ?? null),
+		getEmails: vi.fn(async () => thread),
+		markInjectionChecked: vi.fn((id: string) => {
+			const item = emails.get(id);
+			if (item) item.injection_checked = 1;
+		}),
 		createEmail: vi.fn(async () => {}),
 	};
 	const aiRun = vi.fn(async () => ({ response: "NO" }));
@@ -122,15 +144,15 @@ function makeAgent(opts: { limit?: string; folder?: string } = {}) {
 		...(opts.limit !== undefined ? { AUTO_DRAFT_DAILY_LIMIT: opts.limit } : {}),
 	};
 	const agent = new EmailAgent({ storage } as never, env as never);
-	const run = () =>
+	const run = (emailId = opts.emailId ?? "e1") =>
 		agent.handleNewEmail({
 			mailboxId: MAILBOX_ID,
-			emailId: "e1",
+			emailId,
 			sender: "customer@example.com",
 			subject: "Order question",
 			threadId: "t1",
 		});
-	return { run, storage, aiRun };
+	return { run, storage, aiRun, stub, emails, thread };
 }
 
 describe("EmailAgent auto-draft guards", () => {
@@ -161,6 +183,69 @@ describe("EmailAgent auto-draft guards", () => {
 		expect(aiRun.mock.calls.length).toBe(aiCallsBefore);
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining("Auto-draft daily limit reached"));
 		warn.mockRestore();
+	});
+
+	it("scans a single email once and records the injection check", async () => {
+		const { run, aiRun, stub } = makeAgent({ limit: "5" });
+		await run();
+		expect(aiRun).toHaveBeenCalledTimes(1);
+		expect(stub.markInjectionChecked).toHaveBeenCalledWith("e1");
+	});
+
+	it("does not rescan older thread emails that are already checked", async () => {
+		const old: TestEmail = {
+			id: "e0",
+			folder_id: Folders.INBOX,
+			body: "<p>Earlier message.</p>",
+			internal_owned: false,
+			injection_checked: 1,
+		};
+		const current: TestEmail = {
+			id: "e1",
+			folder_id: Folders.INBOX,
+			body: "<p>Hello, I have a question about my order.</p>",
+			internal_owned: false,
+		};
+		const { run, aiRun, stub } = makeAgent({ limit: "5", thread: [old, current] });
+		await run();
+		expect(aiRun).toHaveBeenCalledTimes(1);
+		expect(stub.markInjectionChecked).toHaveBeenCalledTimes(1);
+		expect(stub.markInjectionChecked).toHaveBeenCalledWith("e1");
+	});
+
+	it("scans an unchecked earlier thread email only once", async () => {
+		const old: TestEmail = {
+			id: "e0",
+			folder_id: Folders.INBOX,
+			body: "<p>Earlier message.</p>",
+			internal_owned: false,
+		};
+		const current: TestEmail = {
+			id: "e1",
+			folder_id: Folders.INBOX,
+			body: "<p>Hello, I have a question about my order.</p>",
+			internal_owned: false,
+		};
+		const { run, aiRun, stub, emails, thread } = makeAgent({
+			limit: "5",
+			thread: [old, current],
+		});
+		await run();
+		expect(aiRun).toHaveBeenCalledTimes(2);
+		expect(stub.markInjectionChecked).toHaveBeenCalledWith("e0");
+		expect(stub.markInjectionChecked).toHaveBeenCalledWith("e1");
+
+		const reply: TestEmail = {
+			id: "e2",
+			folder_id: Folders.INBOX,
+			body: "<p>Following up.</p>",
+			internal_owned: false,
+		};
+		emails.set(reply.id, reply);
+		thread.push(reply);
+		await run("e2");
+		expect(aiRun).toHaveBeenCalledTimes(3);
+		expect(stub.markInjectionChecked).toHaveBeenCalledTimes(3);
 	});
 
 	it("uses the default limit of 200 when the var is unset", async () => {

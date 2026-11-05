@@ -121,6 +121,7 @@ interface EmailData {
 	message_id?: string | null;
 	raw_headers?: string | null;
 	internal_owned?: boolean;
+	injection_checked?: boolean;
 }
 
 interface AttachmentData {
@@ -151,6 +152,7 @@ type EmailRow = {
 	message_id: string | null;
 	raw_headers: string | null;
 	internal_owned: number | null;
+	injection_checked: number | null;
 };
 
 type AttachmentRow = {
@@ -627,14 +629,17 @@ export class MailboxDO extends DurableObject<Env> {
 
 	async updateEmail(
 		id: string,
-		{ read, starred }: { read?: boolean; starred?: boolean },
+		{ read, starred, injection_checked }: { read?: boolean; starred?: boolean; injection_checked?: boolean },
 	) {
-		const data: { read?: number; starred?: number } = {};
+		const data: { read?: number; starred?: number; injection_checked?: number } = {};
 		if (read !== undefined) {
 			data.read = read ? 1 : 0;
 		}
 		if (starred !== undefined) {
 			data.starred = starred ? 1 : 0;
+		}
+		if (injection_checked !== undefined) {
+			data.injection_checked = injection_checked ? 1 : 0;
 		}
 
 		if (Object.keys(data).length === 0) {
@@ -648,6 +653,14 @@ export class MailboxDO extends DurableObject<Env> {
 			.run();
 
 		return this.getEmail(id);
+	}
+
+	async markInjectionChecked(id: string) {
+		this.db
+			.update(schema.emails)
+			.set({ injection_checked: 1 })
+			.where(eq(schema.emails.id, id))
+			.run();
 	}
 
 	async markThreadRead(threadId: string) {
@@ -1273,6 +1286,7 @@ export class MailboxDO extends DurableObject<Env> {
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
 				internal_owned: email.internal_owned ? 1 : 0,
+				injection_checked: email.injection_checked ? 1 : 0,
 			})
 			.run();
 
