@@ -195,6 +195,56 @@ describe("mailbox routes", () => {
 		expect(bucket.put).toHaveBeenCalledWith("mailboxes/sales@0509.io.json", expect.any(String));
 	});
 
+	it("returns the name given at create from the list and read routes", async () => {
+		const { json, request } = makeHarness({ mailboxes: [] });
+		const created = await json("/api/v1/mailboxes", "POST", { email: "verify@0509.io", name: "Verify" });
+		expect(created.status).toBe(201);
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: "verify@0509.io", email: "verify@0509.io", name: "Verify", unreadInboxCount: 2 },
+		]);
+
+		const read = await request("/api/v1/mailboxes/verify@0509.io");
+		expect(await read.json()).toMatchObject({
+			id: "verify@0509.io",
+			email: "verify@0509.io",
+			name: "Verify",
+			settings: { fromName: "Verify" },
+		});
+	});
+
+	it("falls back to the address when the mailbox has no stored name", async () => {
+		const { json, request } = makeHarness();
+		await json(BASE, "PUT", { settings: {} });
+
+		const read = await request(BASE);
+		expect(await read.json()).toMatchObject({ name: MAILBOX_ID });
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, unreadInboxCount: 2 },
+		]);
+	});
+
+	it("keeps the list within its time budget when a mailbox name read hangs", async () => {
+		vi.useFakeTimers();
+		try {
+			const { request, bucket } = makeHarness();
+			bucket.get.mockReturnValueOnce(new Promise(() => {}));
+			vi.spyOn(console, "warn").mockImplementationOnce(() => {});
+			const pending = request("/api/v1/mailboxes");
+			await vi.runOnlyPendingTimersAsync();
+			const res = await pending;
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual([
+				{ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, unreadInboxCount: 2 },
+			]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("refuses to create a mailbox that exists", async () => {
 		const { json } = makeHarness();
 		const res = await json("/api/v1/mailboxes", "POST", { email: MAILBOX_ID, name: "Hello" });
