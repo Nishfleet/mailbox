@@ -41,7 +41,7 @@ export async function sendEmail(
 	binding: SendEmail,
 	params: SendEmailParams,
 ): Promise<{ messageId: string }> {
-	const message: Record<string, unknown> = {
+	const message: EmailMessageBuilder = {
 		to: params.to,
 		from: params.from,
 		subject: params.subject,
@@ -58,15 +58,14 @@ export async function sendEmail(
 	}
 
 	if (params.attachments && params.attachments.length > 0) {
-		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
-			filename: att.filename,
-			type: att.type,
-			disposition: att.disposition,
-			...(att.contentId ? { contentId: att.contentId } : {}),
-		}));
+		message.attachments = params.attachments.map((att): EmailAttachment => {
+			const attachment = { content: att.content, filename: att.filename, type: att.type };
+			return att.disposition === "inline" && att.contentId
+				? { ...attachment, disposition: "inline", contentId: att.contentId }
+				: { ...attachment, disposition: "attachment" };
+		});
 	}
 
-	const result = await binding.send(message as any);
+	const result = await binding.send(message);
 	return { messageId: result.messageId };
 }

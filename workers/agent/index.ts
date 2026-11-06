@@ -10,6 +10,7 @@ import {
 	stepCountIs,
 } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
+import type { StreamTextOnFinishCallback, ToolSet } from "ai";
 import { z } from "zod";
 import type { EmailDetail } from "../../shared/email";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
@@ -36,10 +37,12 @@ import { parseAutoDraftDailyLimit, takeAutoDraftSlot } from "../lib/auto-draft-b
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
-function defineTool(def: {
+// The schema is generic so each `execute` callback receives fully typed
+// arguments instead of `any`.
+function defineTool<SCHEMA extends z.ZodType>(def: {
 	description: string;
-	parameters: z.ZodType<any>;
-	execute: (...args: any[]) => Promise<any>;
+	parameters: SCHEMA;
+	execute: (input: z.infer<SCHEMA>) => Promise<unknown>;
 }) {
 	return {
 		description: def.description,
@@ -294,11 +297,11 @@ function createEmailTools(
 // SEND_EMAIL binding shape and the AIChatAgent constraint.  The actual env
 // is fully typed inside the tools via the closure.
 export class EmailAgent extends AIChatAgent<any> {
-	async onChatMessage(onFinish: any) {
+	async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
 		const workersai = createWorkersAI({ binding: env.AI });
-		const tools = createEmailTools(env, mailboxId, {
+		const tools: ToolSet = createEmailTools(env, mailboxId, {
 			includeAttentionSummary: true,
 		});
 		const systemPrompt = await getSystemPrompt(env, mailboxId);
@@ -323,13 +326,13 @@ export class EmailAgent extends AIChatAgent<any> {
 		const url = new URL(request.url);
 		if (url.pathname === "/onNewEmail" && request.method === "POST") {
 			try {
-				const emailData = await request.json() as {
+				const emailData = await request.json<{
 					mailboxId: string;
 					emailId: string;
 					sender: string;
 					subject: string;
 					threadId: string;
-				};
+				}>();
 				const result = await this.handleNewEmail(emailData);
 				return new Response(JSON.stringify(result), {
 					headers: { "Content-Type": "application/json" },
@@ -369,7 +372,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		let threadContext = "";
 		let email: EmailDetail | null = null;
 		try {
-			email = (await stub.getEmail(emailData.emailId));
+			email = await stub.getEmail(emailData.emailId);
 		} catch (e) {
 			console.warn("Pre-read failed, agent will use tools:", (e as Error).message);
 		}
@@ -426,11 +429,11 @@ export class EmailAgent extends AIChatAgent<any> {
 			}
 
 		// Load thread for conversation context
-		const threadEmails = (await stub.getEmails({ thread_id: emailData.threadId }));
+		const threadEmails = await stub.getEmails({ thread_id: emailData.threadId });
 		if (threadEmails.length > 1) {
 			const fullThread = await Promise.all(
 				threadEmails.map(async (e) => {
-					const full = (await stub.getEmail(e.id));
+					const full = await stub.getEmail(e.id);
 					const text = full?.body ? stripHtmlToText(full.body) : "";
 					return { id: e.id, sender: e.sender, recipient: e.recipient, subject: e.subject, date: e.date, folder_id: e.folder_id, body_text: text };
 				}),

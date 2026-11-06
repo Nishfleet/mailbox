@@ -353,16 +353,12 @@ export async function buildAttentionSummary(env: Env) {
 		.flatMap((mailbox) => mailbox.topItems)
 		.sort(sortItemsByAttentionPriority);
 	const topItems = allTopItems.slice(0, SUMMARY_TOP_ITEMS_LIMIT);
-	const nextActions = buildAttentionNextActions(
-		allTopItems,
-	) as AttentionNextAction[];
+	const nextActions = buildAttentionNextActions(allTopItems);
 	const notificationActions = buildAttentionNextActions(
 		allTopItems.filter((item) => NOTIFICATION_BUCKETS.has(item.bucket)),
 		NOTIFICATION_ACTION_LIMIT,
-	) as AttentionNextAction[];
-	const agentDesks = buildAgentDeskSummaries(
-		allTopItems,
-	) as AgentDeskSummary[];
+	);
+	const agentDesks = buildAgentDeskSummaries(allTopItems);
 	const hasMoreTopItems =
 		allTopItems.length > topItems.length ||
 		mailboxes.some((mailbox) => mailbox.hasMoreTopItems);

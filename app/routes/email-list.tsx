@@ -268,12 +268,12 @@ export default function EmailListRoute() {
 
 	const handleRefresh = () => {
 		if (mailboxId) {
-			queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
+			void queryClient.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
-			queryClient.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-			queryClient.invalidateQueries({ queryKey: queryKeys.attention });
+			void queryClient.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			void queryClient.invalidateQueries({ queryKey: queryKeys.attention });
 		}
 	};
 

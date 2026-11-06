@@ -251,7 +251,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Email CRUD (Drizzle) ───────────────────────────────────────
 
-	async getEmails(options: GetEmailsOptions = {}): Promise<EmailSummary[]> {
+	getEmails(options: GetEmailsOptions = {}): EmailSummary[] {
 		const {
 			folder,
 			thread_id,
@@ -311,7 +311,7 @@ export class MailboxDO extends DurableObject<Env> {
 	/**
 	 * Count total emails matching the given filters (for pagination).
 	 */
-	async countEmails(options: { folder?: string; thread_id?: string } = {}) {
+	countEmails(options: { folder?: string; thread_id?: string } = {}) {
 		const { folder, thread_id } = options;
 		const conditions: string[] = [];
 		const params: (string | number)[] = [];
@@ -342,7 +342,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Threaded queries (raw SQL — too complex for Drizzle's builder) ──
 
-	async getThreadedEmails(options: GetEmailsOptions = {}): Promise<ThreadSummary[] | EmailSummary[]> {
+	getThreadedEmails(options: GetEmailsOptions = {}): ThreadSummary[] | EmailSummary[] {
 		const {
 			folder,
 			page = 1,
@@ -517,7 +517,7 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Count threaded conversations in a folder (for pagination).
 	 * Returns the number of conversation groups, not individual emails.
 	 */
-	async countThreadedEmails(folder: string) {
+	countThreadedEmails(folder: string) {
 		const isDraftFolder = folder === Folders.DRAFT;
 
 		if (isDraftFolder) {
@@ -564,7 +564,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Single email operations (Drizzle) ──────────────────────────
 
-	async getEmail(id: string): Promise<EmailDetail | null> {
+	getEmail(id: string): EmailDetail | null {
 		const email = this.db
 			.select()
 			.from(schema.emails)
@@ -590,7 +590,7 @@ export class MailboxDO extends DurableObject<Env> {
 	 * two queries (one for emails, one for attachments) instead of
 	 * N+1 individual getEmail calls.
 	 */
-	async getThreadEmails(threadId: string): Promise<EmailDetail[]> {
+	getThreadEmails(threadId: string): EmailDetail[] {
 		const emailRows = [
 			...this.ctx.storage.sql.exec<EmailRow>(
 				`SELECT * FROM emails WHERE thread_id = ?1 ORDER BY date ASC`,
@@ -625,7 +625,7 @@ export class MailboxDO extends DurableObject<Env> {
 		}));
 	}
 
-	async updateEmail(
+	updateEmail(
 		id: string,
 		{ read, starred }: { read?: boolean; starred?: boolean },
 	) {
@@ -650,7 +650,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return this.getEmail(id);
 	}
 
-	async markThreadRead(threadId: string) {
+	markThreadRead(threadId: string) {
 		this.ctx.storage.sql.exec(
 			`UPDATE emails SET read = 1 WHERE thread_id = ? AND read = 0`,
 			threadId,
@@ -658,7 +658,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return { threadId, markedRead: true };
 	}
 
-	async deleteEmail(id: string) {
+	deleteEmail(id: string) {
 		const email = this.db
 			.select({ id: schema.emails.id })
 			.from(schema.emails)
@@ -684,7 +684,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return emailAttachments;
 	}
 
-	async getAttachment(id: string): Promise<EmailAttachment | null> {
+	getAttachment(id: string): EmailAttachment | null {
 		return (
 			this.db
 				.select()
@@ -696,7 +696,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Folders (Drizzle) ──────────────────────────────────────────
 
-	async getFolders() {
+	getFolders() {
 		const result = this.db
 			.select({
 				id: schema.folders.id,
@@ -710,7 +710,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return result;
 	}
 
-	async getInboxUnreadCount() {
+	getInboxUnreadCount() {
 		const actionable = this.#actionableAttentionFilter("e");
 		const row = [
 			...this.ctx.storage.sql.exec(
@@ -724,7 +724,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return row?.unreadCount ?? 0;
 	}
 
-	async getAttentionSummary() {
+	getAttentionSummary() {
 		const agingThreshold = new Date(Date.now() - AGING_THRESHOLD_MS).toISOString();
 		const keywordThreshold = new Date(Date.now() - KEYWORD_ATTENTION_LOOKBACK_MS).toISOString();
 		const actionable = this.#actionableAttentionFilter("e");
@@ -756,20 +756,20 @@ export class MailboxDO extends DurableObject<Env> {
 		const agingWhere = `e.folder_id = ? AND e.read = 0 AND e.date <= ? AND ${actionable.sql}`;
 		const draftWhere = `e.folder_id = ? AND ${actionable.sql}`;
 
-		const [
-			counts,
-			categories,
-			needsReplyCount,
-		] = await Promise.all([
-			this.#getAttentionCounts(agingThreshold, actionable),
-			this.#getAttentionCategoryCounts(keywordThreshold, unresolvedThreadWhere, actionable),
-			this.#countAttentionRows(needsReplyWhere, [
-				Folders.INBOX,
-				agingThreshold,
-				...actionable.params,
-				Folders.DRAFT,
-				Folders.SENT,
-			]),
+		// All three helpers below are synchronous (local SQL storage), so
+		// they are invoked directly instead of through Promise.all.
+		const counts = this.#getAttentionCounts(agingThreshold, actionable);
+		const categories = this.#getAttentionCategoryCounts(
+			keywordThreshold,
+			unresolvedThreadWhere,
+			actionable,
+		);
+		const needsReplyCount = this.#countAttentionRows(needsReplyWhere, [
+			Folders.INBOX,
+			agingThreshold,
+			...actionable.params,
+			Folders.DRAFT,
+			Folders.SENT,
 		]);
 
 		const topItems = [
@@ -995,7 +995,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return deduped;
 	}
 
-	async createFolder(id: string, name: string, is_deletable: number = 1) {
+	createFolder(id: string, name: string, is_deletable: number = 1) {
 		try {
 			const result = this.db
 				.insert(schema.folders)
@@ -1011,7 +1011,7 @@ export class MailboxDO extends DurableObject<Env> {
 		}
 	}
 
-	async updateFolder(id: string, name: string) {
+	updateFolder(id: string, name: string) {
 		const result = this.db
 			.update(schema.folders)
 			.set({ name })
@@ -1021,7 +1021,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return result;
 	}
 
-	async deleteFolder(id: string) {
+	deleteFolder(id: string) {
 		const folder = this.db
 			.select({ is_deletable: schema.folders.is_deletable })
 			.from(schema.folders)
@@ -1040,7 +1040,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return true;
 	}
 
-	async moveEmail(id: string, folderId: string) {
+	moveEmail(id: string, folderId: string) {
 		const folder = this.db
 			.select({ id: schema.folders.id })
 			.from(schema.folders)
@@ -1103,7 +1103,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return { conditions, params };
 	}
 
-	async searchEmails(options: SearchFilterOptions & { page?: number; limit?: number }): Promise<SearchResult[]> {
+	searchEmails(options: SearchFilterOptions & { page?: number; limit?: number }): SearchResult[] {
 		const { page = 1, limit: rawLimit = 25 } = options;
 		const limit = Math.min(Math.max(rawLimit, 1), 100);
 		const { conditions, params } = this.#buildSearchConditions(options, "e");
@@ -1130,7 +1130,7 @@ export class MailboxDO extends DurableObject<Env> {
 	/**
 	 * Count total search results matching the given filters (for pagination).
 	 */
-	async countSearchResults(options: SearchFilterOptions) {
+	countSearchResults(options: SearchFilterOptions) {
 		const { conditions, params } = this.#buildSearchConditions(options);
 
 		const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1144,7 +1144,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Threading helpers (raw SQL) ────────────────────────────────
 
-	async findThreadBySubject(subject: string, senderAddress?: string): Promise<string | null> {
+	findThreadBySubject(subject: string, senderAddress?: string): string | null {
 		const normalized = subject
 			.replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")
 			.trim()
@@ -1200,7 +1200,7 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Limits: 20 emails per hour, 100 per day per mailbox.
 	 * Returns null if under limit, or an error message string if exceeded.
 	 */
-	async checkSendRateLimit(): Promise<string | null> {
+	checkSendRateLimit(): string | null {
 		const hourRow = [...this.ctx.storage.sql.exec(
 			`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
@@ -1228,7 +1228,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
-	async createEmail(
+	createEmail(
 		folder: string,
 		email: EmailData,
 		attachments: AttachmentData[],
