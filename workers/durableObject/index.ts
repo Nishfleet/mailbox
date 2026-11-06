@@ -756,8 +756,6 @@ export class MailboxDO extends DurableObject<Env> {
 		const agingWhere = `e.folder_id = ? AND e.read = 0 AND e.date <= ? AND ${actionable.sql}`;
 		const draftWhere = `e.folder_id = ? AND ${actionable.sql}`;
 
-		// All three helpers below are synchronous (local SQL storage), so
-		// they are invoked directly instead of through Promise.all.
 		const counts = this.#getAttentionCounts(agingThreshold, actionable);
 		const categories = this.#getAttentionCategoryCounts(
 			keywordThreshold,

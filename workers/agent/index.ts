@@ -37,8 +37,6 @@ import { parseAutoDraftDailyLimit, takeAutoDraftSlot } from "../lib/auto-draft-b
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
-// The schema is generic so each `execute` callback receives fully typed
-// arguments instead of `any`.
 function defineTool<SCHEMA extends z.ZodType>(def: {
 	description: string;
 	parameters: SCHEMA;
