@@ -75,7 +75,7 @@ export class EmailMCP extends McpAgent<Env> {
 		version: "1.0.0",
 	});
 
-	async init() {
+	init(): Promise<void> {
 		const env = this.env;
 
 		/**
@@ -444,5 +444,6 @@ export class EmailMCP extends McpAgent<Env> {
 				return mcpText(result);
 			},
 		);
+		return Promise.resolve();
 	}
 }
