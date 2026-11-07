@@ -17,7 +17,7 @@
 	"dependencies": {
 		"@ai-sdk/react": "3.0.216",
 		"@cloudflare/ai-chat": "^0.1.8",
-		"@cloudflare/kumo": "^1.13.0",
+		"@cloudflare/kumo": "^2.16.0",
 		"@hono/zod-validator": "^0.9.1",
 		"@modelcontextprotocol/sdk": "^1.32.2",
 		"@phosphor-icons/react": "^2.1.10",
