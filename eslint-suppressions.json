@@ -369,7 +369,7 @@
       "count": 1
     },
     "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
@@ -381,7 +381,7 @@
       "count": 2
     },
     "no-comments/disallowComments": {
-      "count": 33
+      "count": 32
     },
     "no-inline-comments": {
       "count": 5

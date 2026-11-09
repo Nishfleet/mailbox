@@ -33,6 +33,7 @@ import {
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
 import type { Env } from "../types";
 import { parseAutoDraftDailyLimit, takeAutoDraftSlot } from "../lib/auto-draft-budget";
+import { readMailboxSettings } from "../lib/mailbox-settings";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
@@ -97,14 +98,8 @@ Use discard_draft to delete drafts that the operator rejects or that are no long
  */
 async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
 	try {
-		const key = `mailboxes/${mailboxId}.json`;
-		const obj = await env.BUCKET.get(key);
-		if (obj) {
-			const settings = await obj.json<Record<string, unknown>>();
-			if (typeof settings.agentSystemPrompt === "string" && settings.agentSystemPrompt.trim()) {
-				return settings.agentSystemPrompt;
-			}
-		}
+		const settings = await readMailboxSettings(env, mailboxId);
+		if (settings?.agentSystemPrompt?.trim()) return settings.agentSystemPrompt;
 	} catch {
 		// Fall through to default
 	}

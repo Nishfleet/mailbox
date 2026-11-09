@@ -10,6 +10,7 @@
  */
 import DOMPurify from "dompurify";
 import { formatQuotedDate } from "shared/dates";
+import type { MailboxSettings } from "../../shared/mailbox-settings";
 import type { Attachment } from "~/types";
 
 export {
@@ -132,9 +133,7 @@ export function escapeHtml(text: string): string {
 /**
  * Generate the HTML signature block for compose forms.
  */
-export function getSignatureBlock(settings?: {
-	signature?: { enabled: boolean; text?: string; html?: string };
-}): string {
+export function getSignatureBlock(settings?: MailboxSettings): string {
 	const sig = settings?.signature;
 	if (sig?.enabled && (sig?.html || sig?.text)) {
 		// Sanitize HTML signatures with DOMPurify to allow safe formatting

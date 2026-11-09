@@ -4,10 +4,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { app } from "./index";
+import { mailboxSettingsKey, MAILBOX_SETTINGS_PREFIX } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 
 const MAILBOX_ID = "hello@0509.io";
-const MAILBOX_KEY = `mailboxes/${MAILBOX_ID}.json`;
+const MAILBOX_KEY = mailboxSettingsKey(MAILBOX_ID);
 const BASE = `/api/v1/mailboxes/${MAILBOX_ID}`;
 
 const ORIGINAL_EMAIL = {
@@ -32,9 +33,9 @@ const ZERO_ATTENTION = {
 	topItems: [],
 };
 
-function makeHarness({ mailboxes = [MAILBOX_ID] }: { mailboxes?: string[] } = {}) {
+function makeHarness({ mailboxes = [MAILBOX_ID], settings }: { mailboxes?: string[]; settings?: unknown } = {}) {
 	const objects = new Map<string, string>(
-		mailboxes.map((id) => [`mailboxes/${id}.json`, JSON.stringify({ fromName: id })]),
+		mailboxes.map((id) => [mailboxSettingsKey(id), JSON.stringify(settings ?? { fromName: id })]),
 	);
 	objects.set("attachments/email-1/att-1/report.pdf", "pdf-bytes");
 
@@ -53,7 +54,7 @@ function makeHarness({ mailboxes = [MAILBOX_ID] }: { mailboxes?: string[] } = {}
 		}),
 		list: vi.fn(async () => ({
 			objects: [...objects.keys()]
-				.filter((key) => key.startsWith("mailboxes/"))
+				.filter((key) => key.startsWith(MAILBOX_SETTINGS_PREFIX))
 				.map((key) => ({ key })),
 			truncated: false,
 		})),
@@ -192,7 +193,7 @@ describe("mailbox routes", () => {
 		const { json, bucket } = makeHarness({ mailboxes: [] });
 		const res = await json("/api/v1/mailboxes", "POST", { email: "Sales@0509.io", name: "Sales" });
 		expect(res.status).toBe(201);
-		expect(bucket.put).toHaveBeenCalledWith("mailboxes/sales@0509.io.json", expect.any(String));
+		expect(bucket.put).toHaveBeenCalledWith(mailboxSettingsKey("sales@0509.io"), expect.any(String));
 	});
 
 	it("returns the name given at create from the list and read routes", async () => {
@@ -268,7 +269,32 @@ describe("mailbox routes", () => {
 		const { json } = makeHarness();
 		const res = await json(BASE, "PUT", { settings: { fromName: "Hello team" } });
 		expect(res.status).toBe(200);
-		expect(await res.json()).toMatchObject({ settings: { fromName: "Hello team" } });
+		expect(await res.json()).toMatchObject({ name: "Hello team", settings: { fromName: "Hello team" } });
+	});
+
+	it("derives the same display name for the update, read and list routes", async () => {
+		const { json, request } = makeHarness();
+		await json(BASE, "PUT", { settings: { fromName: "Hello team" } });
+
+		const read = await request(BASE);
+		expect(await read.json()).toMatchObject({ name: "Hello team" });
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: MAILBOX_ID, email: MAILBOX_ID, name: "Hello team", unreadInboxCount: 2 },
+		]);
+	});
+
+	it("falls back to the address and no settings when the stored settings do not parse", async () => {
+		const { request } = makeHarness({ settings: "not-an-object" });
+
+		const read = await request(BASE);
+		expect(await read.json()).toEqual({ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, settings: null });
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, unreadInboxCount: 2 },
+		]);
 	});
 
 	it("refuses to update an unknown mailbox", async () => {

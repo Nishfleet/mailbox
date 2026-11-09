@@ -5,10 +5,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyMailboxForwarding, receiveEmail, type IncomingEmailEvent } from "./index";
 import { Folders } from "../shared/folders";
+import { mailboxSettingsKey } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 
 const MAILBOX_ID = "billing@0509.io";
 const FORWARD_TO = "nish@gmail.com";
+const MAILBOX_KEY = mailboxSettingsKey(MAILBOX_ID);
 
 const RAW_MIME = [
 	"From: Sender <sender@example.com>",
@@ -44,7 +46,7 @@ type CreateEmailSpy = ReturnType<typeof vi.fn>;
 function makeHarness(settings: unknown, forward?: (rcptTo: string) => Promise<unknown>) {
 	const order: string[] = [];
 	const storedFolders: unknown[] = [];
-	const mailboxKey = `mailboxes/${MAILBOX_ID}.json`;
+	const mailboxKey = MAILBOX_KEY;
 
 	const createEmail: CreateEmailSpy = vi.fn(async (folder: unknown) => {
 		order.push("createEmail");
