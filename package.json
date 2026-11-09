@@ -15,8 +15,8 @@
 		"lint": "eslint ."
 	},
 	"dependencies": {
-		"@ai-sdk/react": "3.0.216",
-		"@cloudflare/ai-chat": "^0.1.8",
+		"@ai-sdk/react": "4.0.167",
+		"@cloudflare/ai-chat": "^0.12.2",
 		"@cloudflare/kumo": "^1.13.0",
 		"@hono/zod-validator": "^0.9.1",
 		"@modelcontextprotocol/sdk": "^1.32.2",
@@ -32,8 +32,8 @@
 		"@tiptap/extension-underline": "3.32.2",
 		"@tiptap/react": "3.32.2",
 		"@tiptap/starter-kit": "3.32.2",
-		"agents": "^0.7.6",
-		"ai": "6.0.214",
+		"agents": "^0.33.0",
+		"ai": "7.0.163",
 		"dompurify": "^3.4.17",
 		"drizzle-orm": "^0.45.4",
 		"hono": "^4.13.16",
@@ -45,7 +45,7 @@
 		"react-markdown": "^10.1.0",
 		"react-router": "7.18.2",
 		"remark-gfm": "^4.0.1",
-		"workers-ai-provider": "^3.1.2",
+		"workers-ai-provider": "^4.0.1",
 		"zod": "^3.25.76",
 		"zustand": "^5.0.16"
 	},
