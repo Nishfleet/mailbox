@@ -40,9 +40,10 @@ function logTriggerFailure(
  * Never throws. A rejected call or a non-2xx response is written as one
  * structured error log line, so a failure is visible without breaking intake.
  *
- * The DO namespace binding is typed untyped (`DurableObjectNamespace<undefined>`) by
- * cf's config-level type generator, because the worker references itself by name.
- * Narrow it here, where `getAgentByName` wants the Agent-typed namespace.
+ * The DO namespace binding comes out of the config-level type generator as
+ * an untyped `DurableObjectNamespace<undefined>`, because the worker
+ * references itself by name. Narrow it here, where `getAgentByName` wants
+ * the Agent-typed namespace.
  */
 export async function triggerAutoDraft(env: Env, payload: AutoDraftTriggerPayload): Promise<void> {
 	try {
