@@ -57,7 +57,9 @@ export default function ComposePanel() {
 			</div>
 
 			<form
-				onSubmit={(e) => handleSend(e, closePanel)}
+				onSubmit={(e) => {
+					void handleSend(e, closePanel);
+				}}
 				className="flex flex-col flex-1 min-h-0 overflow-y-auto"
 			>
 				<div className="p-4 md:p-6 space-y-4">
@@ -162,7 +164,9 @@ export default function ComposePanel() {
 								loading={isSavingDraft}
 								disabled={isSending}
 								icon={<FloppyDiskIcon size={14} />}
-								onClick={handleSaveDraft}
+								onClick={() => {
+									void handleSaveDraft();
+								}}
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>

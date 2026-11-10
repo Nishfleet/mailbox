@@ -28,7 +28,7 @@ export default function Header() {
 	const performSearch = () => {
 		if (mailboxId && searchQuery.trim()) {
 			const q = searchQuery.trim();
-			navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
+			void navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
 			setIsSearchExpanded(false);
 		}
 	};
@@ -36,7 +36,7 @@ export default function Header() {
 	const clearSearch = () => {
 		setSearchQuery("");
 		if (location.pathname.includes("/search") && mailboxId) {
-			navigate(`/mailbox/${mailboxId}/emails/inbox`);
+			void navigate(`/mailbox/${mailboxId}/emails/inbox`);
 		}
 	};
 
@@ -134,13 +134,13 @@ export default function Header() {
 						variant={isSettingsActive ? "secondary" : "ghost"}
 						shape="square"
 						icon={<GearSixIcon size={20} />}
-						onClick={() =>
-							navigate(
+						onClick={() => {
+							void navigate(
 								isSettingsActive
 									? `/mailbox/${mailboxId}/emails/inbox`
 									: `/mailbox/${mailboxId}/settings`,
-							)
-						}
+							);
+						}}
 						aria-label="Settings"
 					/>
 				</Tooltip>

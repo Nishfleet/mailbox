@@ -19,9 +19,10 @@ function memoryStorage() {
 	const data = new Map<string, unknown>();
 	return {
 		data,
-		get: vi.fn(async (key: string) => data.get(key)),
-		put: vi.fn(async (key: string, value: unknown) => {
+		get: vi.fn((key: string) => Promise.resolve(data.get(key))),
+		put: vi.fn((key: string, value: unknown) => {
 			data.set(key, value);
+			return Promise.resolve();
 		}),
 	};
 }
@@ -72,7 +73,7 @@ describe("takeAutoDraftSlot", () => {
 
 // ── EmailAgent.handleNewEmail ──────────────────────────────────────
 
-const generateText = vi.fn(async () => ({ steps: [], text: "" }));
+const generateText = vi.fn(() => Promise.resolve({ steps: [], text: "" }));
 
 // The real AIChatAgent needs the Workers runtime; this stand-in gives the
 // agent an env, Durable Object storage and chat history.
@@ -85,8 +86,9 @@ vi.mock("@cloudflare/ai-chat", () => ({
 			this.ctx = ctx;
 			this.env = env;
 		}
-		async persistMessages(messages: unknown[]) {
+		persistMessages(messages: unknown[]) {
 			this.messages = messages;
+			return Promise.resolve();
 		}
 	},
 }));
@@ -94,7 +96,7 @@ vi.mock("workers-ai-provider", () => ({ createWorkersAI: () => () => ({}) }));
 vi.mock("ai", async (importOriginal) => ({
 	...(await importOriginal<typeof import("ai")>()),
 	generateText: (...args: unknown[]) => generateText(...(args as [])),
-	convertToModelMessages: async (m: unknown) => m,
+	convertToModelMessages: (m: unknown) => Promise.resolve(m),
 }));
 
 const { EmailAgent } = await import("./agent/index");
@@ -128,22 +130,22 @@ function makeAgent(
 	for (const item of opts.thread ?? []) emails.set(item.id, item);
 	const thread = opts.thread ?? [email];
 	const stub = {
-		getEmail: vi.fn(async (id: string) => emails.get(id) ?? null),
-		getEmails: vi.fn(async () => thread),
+		getEmail: vi.fn((id: string) => Promise.resolve(emails.get(id) ?? null)),
+		getEmails: vi.fn(() => Promise.resolve(thread)),
 		markInjectionChecked: vi.fn((id: string) => {
 			const item = emails.get(id);
 			if (item) item.injection_checked = 1;
 		}),
-		createEmail: vi.fn(async () => {}),
+		createEmail: vi.fn(() => Promise.resolve()),
 	};
-	const aiRun = vi.fn(async () => ({ response: "NO" }));
+	const aiRun = vi.fn(() => Promise.resolve({ response: "NO" }));
 	const env = {
 		MAILBOX: { idFromName: (name: string) => name, get: () => stub },
-		BUCKET: { get: vi.fn(async () => null) },
+		BUCKET: { get: vi.fn(() => Promise.resolve(null)) },
 		AI: { run: aiRun },
 		...(opts.limit !== undefined ? { AUTO_DRAFT_DAILY_LIMIT: opts.limit } : {}),
 	};
-	const agent = new EmailAgent({ storage } as never, env as never);
+	const agent = new EmailAgent({ storage } as never, env);
 	const run = (emailId = opts.emailId ?? "e1") =>
 		agent.handleNewEmail({
 			mailboxId: MAILBOX_ID,

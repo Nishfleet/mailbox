@@ -62,6 +62,7 @@ const DraftBody = z.object({
 });
 
 const MAILBOX_COUNT_TIMEOUT_MS = 5000;
+const MAILBOX_NAME_TIMEOUT_MS = 5000;
 const MAILBOX_COUNT_CONCURRENCY = 6;
 const MAILBOX_LIST_BUDGET_MS = 12000;
 const MAILBOX_COUNT_START_BUFFER_MS = 500;
@@ -85,6 +86,29 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	const v = c.req.query(key);
 	if (v === undefined || v === "") return undefined;
 	return v === "true" || v === "1";
+}
+
+function mailboxDisplayName(mailboxId: string, fromName: unknown): string {
+	return typeof fromName === "string" && fromName.length > 0 ? fromName : mailboxId;
+}
+
+async function getMailboxName(env: Env, mailboxId: string, timeoutMs: number): Promise<string> {
+	try {
+		const name = await withTimeout(
+			(async () => {
+				const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+				if (!obj) return mailboxId;
+				const settings = await obj.json<{ fromName?: string }>();
+				return mailboxDisplayName(mailboxId, settings?.fromName);
+			})(),
+			timeoutMs,
+			() => console.warn(`Timed out loading display name for ${mailboxId}`),
+		);
+		return name ?? mailboxId;
+	} catch (error) {
+		console.error(`Failed to load display name for ${mailboxId}`, error);
+		return mailboxId;
+	}
 }
 
 async function getInboxUnreadCount(
@@ -153,10 +177,19 @@ app.get("/api/v1/mailboxes", async (c) => {
 		allMailboxes,
 		MAILBOX_COUNT_CONCURRENCY,
 		async (m) => {
+			const nameBudgetMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
+			const name =
+				nameBudgetMs > 0
+					? await getMailboxName(
+							c.env,
+							m.id,
+							Math.min(MAILBOX_NAME_TIMEOUT_MS, nameBudgetMs),
+						)
+					: m.id;
 			const remainingMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
 			return {
 				...m,
-				name: m.id,
+				name,
 				unreadInboxCount:
 					remainingMs > 0
 						? await getInboxUnreadCount(
@@ -193,10 +226,16 @@ app.post("/api/v1/mailboxes", zValidator("json", CreateMailboxBody), async (c) =
 });
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
+	const mailboxId = c.req.param("mailboxId");
 	const obj = await c.env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 	if (!obj) return c.json({ error: "Not found" }, 404);
-	return c.json({ id: mailboxId, name: mailboxId, email: mailboxId, settings: await obj.json() });
+	const settings = await obj.json<{ fromName?: string }>();
+	return c.json({
+		id: mailboxId,
+		name: mailboxDisplayName(mailboxId, settings?.fromName),
+		email: mailboxId,
+		settings,
+	});
 });
 
 app.put("/api/v1/mailboxes/:mailboxId", zValidator("json", UpdateMailboxBody), async (c) => {
@@ -209,7 +248,7 @@ app.put("/api/v1/mailboxes/:mailboxId", zValidator("json", UpdateMailboxBody), a
 });
 
 app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
+	const mailboxId = c.req.param("mailboxId");
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
@@ -409,7 +448,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
-async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
+async function streamToArrayBuffer(stream: ReadableStream<Uint8Array>, streamSize: number) {
 	if (streamSize > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
 	if (streamSize <= 0) throw new Error(`Invalid stream size: ${streamSize}`);
 	const result = new Uint8Array(streamSize);
@@ -418,7 +457,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
-		if (bytesRead + value.length > streamSize) { reader.cancel(); throw new Error(`Stream exceeds declared size`); }
+		if (bytesRead + value.length > streamSize) { void reader.cancel(); throw new Error(`Stream exceeds declared size`); }
 		result.set(value, bytesRead);
 		bytesRead += value.length;
 	}
@@ -434,7 +473,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
  * See: https://developers.cloudflare.com/email-service/examples/email-routing/email-storage/
  */
 type IncomingEmailEvent = {
-	raw: ReadableStream;
+	raw: ReadableStream<Uint8Array>;
 	rawSize: number;
 	from?: string;
 	to?: string;
@@ -459,7 +498,7 @@ async function getForwardingRule(env: Env, mailboxId: string): Promise<Forwardin
 	try {
 		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 		if (!obj) return null;
-		const forwarding = ((await obj.json()) as MailboxForwardingSettings)?.forwarding;
+		const forwarding = (await obj.json<MailboxForwardingSettings>())?.forwarding;
 		const target = forwarding?.email?.trim() ?? "";
 		if (!forwarding?.enabled || !target) return null;
 		return { target, spam: forwarding.spam !== false, internal: forwarding.internal !== false };
