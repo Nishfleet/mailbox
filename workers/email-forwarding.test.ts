@@ -5,12 +5,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyMailboxForwarding, receiveEmail, type IncomingEmailEvent } from "./index";
 import { Folders } from "../shared/folders";
-import { mailboxSettingsKey } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 
 const MAILBOX_ID = "billing@0509.io";
 const FORWARD_TO = "nish@gmail.com";
-const MAILBOX_KEY = mailboxSettingsKey(MAILBOX_ID);
 
 const RAW_MIME = [
 	"From: Sender <sender@example.com>",
@@ -46,7 +44,7 @@ type CreateEmailSpy = ReturnType<typeof vi.fn>;
 function makeHarness(settings: unknown, forward?: (rcptTo: string) => Promise<unknown>) {
 	const order: string[] = [];
 	const storedFolders: unknown[] = [];
-	const mailboxKey = MAILBOX_KEY;
+	const mailboxKey = `mailboxes/${MAILBOX_ID}.json`;
 
 	const createEmail: CreateEmailSpy = vi.fn(async (folder: unknown) => {
 		order.push("createEmail");
@@ -110,6 +108,18 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		expect(order).toEqual(["createEmail", "forward"]);
 		// Normal inbox mail still triggers the auto-draft.
 		expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
+	});
+
+	it("still forwards when another settings section is malformed", async () => {
+		const forward = vi.fn(() => Promise.resolve(undefined));
+		const { env, ctx, event } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO }, signature: "broken" },
+			forward,
+		);
+
+		await receiveEmail(event, env, ctx);
+
+		expect(forward).toHaveBeenCalledWith(FORWARD_TO);
 	});
 
 	it("forwards mail that the spam heuristic flags", async () => {

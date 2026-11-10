@@ -25,7 +25,7 @@ import { SendEmailRequestSchema } from "./lib/schemas";
 import { isHighConfidenceSpam } from "./lib/spam.js";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
-import { MailboxSettingsSchema } from "../shared/mailbox-settings";
+import { MailboxSettingsSchema, parseMailboxSettings } from "../shared/mailbox-settings";
 import { mailboxDisplayName, mailboxSettingsKey, readMailboxSettings } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
@@ -91,12 +91,12 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 
 async function getMailboxName(env: Env, mailboxId: string, timeoutMs: number): Promise<string> {
 	try {
-		const name = await withTimeout(
+		const settings = await withTimeout(
 			readMailboxSettings(env, mailboxId),
 			timeoutMs,
 			() => console.warn(`Timed out loading display name for ${mailboxId}`),
 		);
-		return mailboxDisplayName(mailboxId, name);
+		return mailboxDisplayName(mailboxId, settings);
 	} catch (error) {
 		console.error(`Failed to load display name for ${mailboxId}`, error);
 		return mailboxId;
@@ -219,9 +219,9 @@ app.post("/api/v1/mailboxes", zValidator("json", CreateMailboxBody), async (c) =
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
-	const key = mailboxSettingsKey(mailboxId);
-	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-	const settings = await readMailboxSettings(c.env, mailboxId);
+	const obj = await c.env.BUCKET.get(mailboxSettingsKey(mailboxId));
+	if (!obj) return c.json({ error: "Not found" }, 404);
+	const settings = parseMailboxSettings(await obj.json());
 	return c.json({
 		id: mailboxId,
 		name: mailboxDisplayName(mailboxId, settings),

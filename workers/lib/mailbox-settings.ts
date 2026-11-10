@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { parseMailboxSettings, type MailboxSettings } from "../../shared/mailbox-settings";
+import { parseMailboxSettings, type StoredMailboxSettings } from "../../shared/mailbox-settings";
 import type { Env } from "../types";
 
 export const MAILBOX_SETTINGS_PREFIX = "mailboxes/";
@@ -14,7 +14,7 @@ export function mailboxSettingsKey(mailboxId: string) {
 export async function readMailboxSettings(
 	env: Env,
 	mailboxId: string,
-): Promise<MailboxSettings | null> {
+): Promise<StoredMailboxSettings | null> {
 	try {
 		const obj = await env.BUCKET.get(mailboxSettingsKey(mailboxId));
 		if (!obj) return null;
@@ -27,7 +27,7 @@ export async function readMailboxSettings(
 
 export function mailboxDisplayName(
 	mailboxId: string,
-	settings: MailboxSettings | null | undefined,
+	settings: StoredMailboxSettings | null | undefined,
 ) {
 	return settings?.fromName ? settings.fromName : mailboxId;
 }

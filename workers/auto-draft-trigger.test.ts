@@ -5,7 +5,6 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { receiveEmail, type IncomingEmailEvent } from "./index";
 import { AUTO_DRAFT_TRIGGER_FAILED } from "./lib/auto-draft-trigger";
-import { mailboxSettingsKey } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 
 const MAILBOX_ID = "hello@0509.io";
@@ -38,7 +37,7 @@ function makeEvent(): IncomingEmailEvent {
 
 async function deliver(agentNamespace: unknown) {
 	const waits: Promise<unknown>[] = [];
-	const mailboxKey = mailboxSettingsKey(MAILBOX_ID);
+	const mailboxKey = `mailboxes/${MAILBOX_ID}.json`;
 	const env = {
 		BUCKET: {
 			head: vi.fn(async (key: string) => (key === mailboxKey ? {} : null)),

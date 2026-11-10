@@ -35,4 +35,4 @@ Preconditions:
 - Delete removes only the R2 entry. The mailbox's emails stay in its Durable Object.
 - Unknown settings keys are dropped on save.
 - The settings PUT replaces the whole settings object. After the Settings step, a read shows only `fromName` and `agentSystemPrompt`, and the default `forwarding`, `signature` and `autoReply` are gone.
-- A stored settings object that does not parse (e.g. a hand-edited R2 file) reads back as the mailbox with `settings: null` and the address as `name`, and its inbound mail is not forwarded.
+- A stored settings value that is not an object (e.g. a hand-edited R2 file) reads back with `settings: null` and the address as `name`. A single malformed section is dropped on read and the other sections still apply, so a bad `signature` does not stop forwarding.

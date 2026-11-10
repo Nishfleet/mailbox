@@ -72,6 +72,10 @@ export default defineConfig(
 		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody] },
 	},
 	{
+		files: ["workers/**/*.test.ts"],
+		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody] },
+	},
+	{
 		files: ["app/**/*.{ts,tsx}"],
 		rules: {
 			"no-restricted-imports": ["error", {
