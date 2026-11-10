@@ -1,23 +1,5 @@
 {
   "app/components/AgentPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
-    "@typescript-eslint/no-misused-promises": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 5
     }
@@ -27,26 +9,12 @@
       "count": 2
     }
   },
-  "app/components/ComposeEmail.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 2
-    }
-  },
   "app/components/ComposePanel.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 2
-    },
     "no-comments/disallowComments": {
       "count": 1
     }
   },
   "app/components/EmailIframe.tsx": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    },
     "no-comments/disallowComments": {
       "count": 9
     },
@@ -55,15 +23,6 @@
     }
   },
   "app/components/EmailPanel.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 2
     },
@@ -75,20 +34,11 @@
     }
   },
   "app/components/Header.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 4
     }
   },
   "app/components/MCPPanel.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
@@ -97,34 +47,16 @@
     }
   },
   "app/components/RichTextEditor.tsx": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 7
     }
   },
   "app/components/Sidebar.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 8
     }
   },
   "app/components/email-panel/EmailPanelDialogs.tsx": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    },
     "no-comments/disallowComments": {
       "count": 1
     }
@@ -166,40 +98,13 @@
     }
   },
   "app/queries/emails.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 12
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 5
-    },
     "no-comments/disallowComments": {
       "count": 17
-    }
-  },
-  "app/queries/folders.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
     }
   },
   "app/queries/keys.ts": {
     "no-comments/disallowComments": {
       "count": 1
-    }
-  },
-  "app/queries/mailboxes.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 2
-    }
-  },
-  "app/queries/search.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 3
     }
   },
   "app/root.tsx": {
@@ -208,20 +113,11 @@
     }
   },
   "app/routes/email-list.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 4
-    },
     "no-comments/disallowComments": {
       "count": 9
     }
   },
   "app/routes/home.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
-    "@typescript-eslint/no-misused-promises": {
-      "count": 2
-    },
     "no-comments/disallowComments": {
       "count": 5
     },
@@ -234,31 +130,17 @@
       "count": 5
     }
   },
-  "app/routes/not-found.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    }
-  },
   "app/routes/search-results.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 2
     }
   },
   "app/routes/settings.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 5
     }
   },
   "app/services/api.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 9
     }
@@ -275,58 +157,23 @@
   },
   "workers/agent/index.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 13
     },
     "no-comments/disallowComments": {
       "count": 30
     }
   },
   "workers/app.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 18
     }
   },
   "workers/auto-draft-budget.test.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 9
-    },
     "no-comments/disallowComments": {
       "count": 6
     }
   },
-  "workers/auto-draft-trigger.test.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
-    "@typescript-eslint/require-await": {
-      "count": 6
-    }
-  },
   "workers/durableObject/index.ts": {
-    "@typescript-eslint/await-thenable": {
-      "count": 3
-    },
-    "@typescript-eslint/require-await": {
-      "count": 19
-    },
     "no-comments/disallowComments": {
       "count": 33
     }
@@ -337,26 +184,11 @@
     }
   },
   "workers/email-forwarding.test.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 2
-    },
-    "@typescript-eslint/require-await": {
-      "count": 16
-    },
-    "@typescript-eslint/unbound-method": {
-      "count": 2
-    },
     "no-comments/disallowComments": {
       "count": 5
     }
   },
   "workers/email-sender.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 3
     },
@@ -365,21 +197,6 @@
     }
   },
   "workers/index.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    },
     "no-comments/disallowComments": {
       "count": 33
     },
@@ -408,20 +225,7 @@
       "count": 1
     }
   },
-  "workers/lib/attention-notification-core.ts": {
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    }
-  },
-  "workers/lib/attention.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 3
-    }
-  },
   "workers/lib/auto-draft-budget.ts": {
-    "@typescript-eslint/no-base-to-string": {
-      "count": 2
-    },
     "no-comments/disallowComments": {
       "count": 5
     }
@@ -432,9 +236,6 @@
     }
   },
   "workers/lib/email-helpers.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 32
     }
@@ -458,42 +259,13 @@
     }
   },
   "workers/mcp-safety.test.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 9
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 7
-    },
     "no-comments/disallowComments": {
       "count": 4
     }
   },
   "workers/mcp/index.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "no-comments/disallowComments": {
       "count": 25
-    }
-  },
-  "workers/routes.test.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 26
     }
   },
   "workers/test-stubs/cloudflare-runtime.ts": {

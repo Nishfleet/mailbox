@@ -229,7 +229,10 @@ export function buildReferencesChain(original: EmailDetail): {
 	let existingRefs: string[] = [];
 	if (original.email_references) {
 		try {
-			existingRefs = JSON.parse(original.email_references);
+			const parsed: unknown = JSON.parse(original.email_references);
+			if (Array.isArray(parsed)) {
+				existingRefs = parsed.filter((ref): ref is string => typeof ref === "string");
+			}
 		} catch {
 			// Malformed JSON in email_references — treat as empty
 		}
