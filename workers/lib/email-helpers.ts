@@ -13,6 +13,7 @@ import type { EmailDetail } from "../../shared/email";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { formatQuotedDate } from "../../shared/dates";
+import { MAILBOX_SETTINGS_PREFIX } from "./mailbox-settings";
 
 const MAILBOX_LIST_PAGE_LIMIT = 100;
 export const INTERNAL_EMAIL_HEADER = "x-nish-internal-email";
@@ -153,7 +154,7 @@ export async function listMailboxes(
 		if (pageCount >= MAILBOX_LIST_PAGE_LIMIT) {
 			throw new Error("R2 mailbox listing exceeded the page limit");
 		}
-		const list = await bucket.list({ prefix: "mailboxes/", cursor });
+		const list = await bucket.list({ prefix: MAILBOX_SETTINGS_PREFIX, cursor });
 		pageCount += 1;
 		objects.push(...list.objects);
 		if (list.truncated && !list.cursor) {
@@ -163,7 +164,7 @@ export async function listMailboxes(
 	} while (cursor);
 
 	return objects.map((obj) => {
-		const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+		const id = obj.key.replace(MAILBOX_SETTINGS_PREFIX, "").replace(".json", "");
 		return { id, email: id };
 	});
 }

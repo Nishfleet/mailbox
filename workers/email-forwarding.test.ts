@@ -112,6 +112,18 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		expect(waitUntil).toHaveBeenCalledTimes(1);
 	});
 
+	it("still forwards when another settings section is malformed", async () => {
+		const forward = vi.fn(() => Promise.resolve(undefined));
+		const { env, ctx, event } = makeHarness(
+			{ forwarding: { enabled: true, email: FORWARD_TO }, signature: "broken" },
+			forward,
+		);
+
+		await receiveEmail(event, env, ctx);
+
+		expect(forward).toHaveBeenCalledWith(FORWARD_TO);
+	});
+
 	it("forwards mail that the spam heuristic flags", async () => {
 		// A false-positive spam classification is exactly the brand mail that must
 		// not vanish, so forwarding runs before the SPAM early return.

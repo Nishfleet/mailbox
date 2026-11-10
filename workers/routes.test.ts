@@ -281,6 +281,68 @@ describe("mailbox routes", () => {
 		expect(await res.json()).toMatchObject({ settings: { fromName: "Hello team" } });
 	});
 
+	it("returns the stored display name from the update, read and list routes", async () => {
+		const { json, request } = makeHarness();
+		const updated = await json(BASE, "PUT", { settings: { fromName: "Hello team" } });
+		expect(await updated.json()).toMatchObject({ name: "Hello team", settings: { fromName: "Hello team" } });
+
+		const read = await request(BASE);
+		expect(await read.json()).toMatchObject({ name: "Hello team" });
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: MAILBOX_ID, email: MAILBOX_ID, name: "Hello team", unreadInboxCount: 2 },
+		]);
+	});
+
+	it("still rejects a settings update with an incomplete section", async () => {
+		const { json, bucket } = makeHarness();
+		const res = await json(BASE, "PUT", { settings: { forwarding: { enabled: true } } });
+		expect(res.status).toBe(400);
+		expect(bucket.put).not.toHaveBeenCalled();
+	});
+
+	it("reads a mailbox with a single settings get and no extra existence check", async () => {
+		const { request, bucket } = makeHarness();
+		const res = await request(BASE);
+		expect(res.status).toBe(200);
+		expect(bucket.get).toHaveBeenCalledTimes(1);
+		expect(bucket.head).toHaveBeenCalledTimes(1);
+	});
+
+	it("returns 500, not 200, when the stored settings cannot be read", async () => {
+		const { request, bucket } = makeHarness();
+		bucket.get.mockRejectedValueOnce(new Error("R2 unavailable"));
+		const res = await request(BASE);
+		expect(res.status).toBe(500);
+	});
+
+	it("falls back to the address and no settings when the stored settings are not an object", async () => {
+		const { request, bucket } = makeHarness();
+		await bucket.put(MAILBOX_KEY, JSON.stringify("not-an-object"));
+
+		const read = await request(BASE);
+		expect(await read.json()).toEqual({ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, settings: null });
+
+		const list = await request("/api/v1/mailboxes");
+		expect(await list.json()).toEqual([
+			{ id: MAILBOX_ID, email: MAILBOX_ID, name: MAILBOX_ID, unreadInboxCount: 2 },
+		]);
+	});
+
+	it("drops only the malformed section when reading stored settings", async () => {
+		const { request, bucket } = makeHarness();
+		await bucket.put(MAILBOX_KEY, JSON.stringify({ fromName: "Hello team", signature: "broken" }));
+
+		const read = await request(BASE);
+		expect(await read.json()).toEqual({
+			id: MAILBOX_ID,
+			email: MAILBOX_ID,
+			name: "Hello team",
+			settings: { fromName: "Hello team" },
+		});
+	});
+
 	it("refuses to update an unknown mailbox", async () => {
 		const { json } = makeHarness();
 		const res = await json("/api/v1/mailboxes/nobody@0509.io", "PUT", { settings: {} });

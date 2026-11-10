@@ -198,7 +198,7 @@
   },
   "workers/index.ts": {
     "no-comments/disallowComments": {
-      "count": 33
+      "count": 32
     },
     "no-inline-comments": {
       "count": 5
