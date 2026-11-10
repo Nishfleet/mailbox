@@ -629,17 +629,14 @@ export class MailboxDO extends DurableObject<Env> {
 
 	async updateEmail(
 		id: string,
-		{ read, starred, injection_checked }: { read?: boolean; starred?: boolean; injection_checked?: boolean },
+		{ read, starred }: { read?: boolean; starred?: boolean },
 	) {
-		const data: { read?: number; starred?: number; injection_checked?: number } = {};
+		const data: { read?: number; starred?: number } = {};
 		if (read !== undefined) {
 			data.read = read ? 1 : 0;
 		}
 		if (starred !== undefined) {
 			data.starred = starred ? 1 : 0;
-		}
-		if (injection_checked !== undefined) {
-			data.injection_checked = injection_checked ? 1 : 0;
 		}
 
 		if (Object.keys(data).length === 0) {
@@ -655,7 +652,7 @@ export class MailboxDO extends DurableObject<Env> {
 		return this.getEmail(id);
 	}
 
-	async markInjectionChecked(id: string) {
+	markInjectionChecked(id: string) {
 		this.db
 			.update(schema.emails)
 			.set({ injection_checked: 1 })

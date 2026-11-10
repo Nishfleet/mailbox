@@ -11,7 +11,7 @@
 
 import { escapeHtml, stripHtmlToText, textToHtml } from "./email-helpers";
 
-const AI_GATEWAY = { id: "default" };
+export const AI_GATEWAY = { id: "default" };
 
 // ── Prompt Injection Scanner ───────────────────────────────────────
 

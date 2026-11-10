@@ -12,7 +12,7 @@ import {
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import type { EmailDetail } from "../../shared/email";
-import { verifyDraft, isPromptInjection } from "../lib/ai";
+import { AI_GATEWAY, verifyDraft, isPromptInjection } from "../lib/ai";
 import {
 	getMailboxStub,
 	stripHtmlToText,
@@ -46,25 +46,6 @@ function defineTool(def: {
 		inputSchema: def.parameters,
 		execute: def.execute,
 	};
-}
-
-type InjectionCheckStub = {
-	markInjectionChecked?: (id: string) => Promise<void> | void;
-	updateEmail?: (id: string, patch: { injection_checked: boolean }) => Promise<unknown>;
-};
-
-async function recordInjectionCheck(
-	stub: ReturnType<typeof getMailboxStub>,
-	emailId: string,
-): Promise<void> {
-	const candidate = stub as unknown as InjectionCheckStub;
-	if (candidate.markInjectionChecked) {
-		await candidate.markInjectionChecked(emailId);
-		return;
-	}
-	if (candidate.updateEmail) {
-		await candidate.updateEmail(emailId, { injection_checked: true });
-	}
 }
 
 /**
@@ -316,7 +297,7 @@ export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI, gateway: { id: "default" } });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools = createEmailTools(env, mailboxId, {
 			includeAttentionSummary: true,
 		});
@@ -376,7 +357,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI, gateway: { id: "default" } });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
 
@@ -443,7 +424,7 @@ export class EmailAgent extends AIChatAgent<any> {
 						return;
 					}
 
-					await recordInjectionCheck(stub, emailData.emailId);
+					await stub.markInjectionChecked(emailData.emailId);
 					scannedEmailIds.add(emailData.emailId);
 				}
 
@@ -508,7 +489,7 @@ export class EmailAgent extends AIChatAgent<any> {
 				}
 
 				await Promise.all(
-					uncheckedThreadEmails.map((e) => recordInjectionCheck(stub, e.id)),
+					uncheckedThreadEmails.map((e) => stub.markInjectionChecked(e.id)),
 				);
 			}
 		}
