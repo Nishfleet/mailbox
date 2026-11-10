@@ -104,9 +104,7 @@ app.all("/agents/*", async (c) => {
 
 // React Router catch-all: serves the SPA for all non-API routes
 app.all("*", (c) => {
-	return requestHandler(c.req.raw, {
-		cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
-	});
+	return requestHandler(c.req.raw);
 });
 
 // Export the Hono app as the default export with an email handler.

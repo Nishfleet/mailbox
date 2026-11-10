@@ -4,6 +4,7 @@
 
 import { getAgentByName } from "agents";
 import type { Env } from "../types";
+import type { EmailAgent } from "../agent/index";
 
 export interface AutoDraftTriggerPayload {
 	mailboxId: string;
@@ -38,10 +39,17 @@ function logTriggerFailure(
  *
  * Never throws. A rejected call or a non-2xx response is written as one
  * structured error log line, so a failure is visible without breaking intake.
+ *
+ * The DO namespace binding is typed untyped (`DurableObjectNamespace<undefined>`) by
+ * cf's config-level type generator, because the worker references itself by name.
+ * Narrow it here, where `getAgentByName` wants the Agent-typed namespace.
  */
 export async function triggerAutoDraft(env: Env, payload: AutoDraftTriggerPayload): Promise<void> {
 	try {
-		const agent = await getAgentByName(env.EMAIL_AGENT, payload.mailboxId);
+		const agent = await getAgentByName(
+			env.EMAIL_AGENT as unknown as DurableObjectNamespace<EmailAgent>,
+			payload.mailboxId,
+		);
 		const response = await agent.fetch(new Request("https://agents/onNewEmail", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
