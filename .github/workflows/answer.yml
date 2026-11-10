@@ -13,4 +13,4 @@ jobs:
     # workflow can only lower the caller's GITHUB_TOKEN permissions, never raise them.
     permissions: {actions: write}
     # @main, not a SHA, the same as the agent stub.
-    uses: Nishfleet/fleet-ops/.github/workflows/answer.yml@main
+    uses: Nishfleet/fleet-ops/.github/workflows/answer.yml@main # zizmor: ignore[unpinned-uses] the owner's own paved road, like agent.yml

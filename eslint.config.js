@@ -44,8 +44,12 @@ export default defineConfig(
 		},
 	},
 	{
-		files: ["**/*.js"],
+		// JS files, including the workflow helper scripts, live outside the
+		// tsconfig projects, so they lint without the typed rules, and Node
+		// globals in them are not worth a globals table, so no-undef is off.
+		files: ["**/*.{js,mjs}"],
 		extends: [tseslint.configs.disableTypeChecked],
+		rules: { "no-undef": "off" },
 	},
 	{
 		files: ["workers/**/*.ts"],
