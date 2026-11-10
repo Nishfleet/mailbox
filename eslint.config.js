@@ -35,7 +35,7 @@ const uncheckedBody = {
 };
 
 export default defineConfig(
-	globalIgnores(["build/", ".react-router/", ".wrangler/", "worker-configuration.d.ts"]),
+	globalIgnores(["build/", ".react-router/", ".wrangler/", ".cloudflare/", "worker-configuration.d.ts"]),
 	eslint.configs.recommended,
 	tseslint.configs.recommendedTypeChecked,
 	{
