@@ -430,12 +430,12 @@ export default function HomeRoute() {
 		}
 		autoCreateDone.current = true;
 		let cancelled = false;
-		Promise.all(
+		void Promise.all(
 			toCreate.map((addr) => {
 				const localPart = addr.split("@")[0] || addr;
 				return api.createMailbox(addr, localPart).catch(() => {});
 			}),
-		).then(() => { if (!cancelled) refetchMailboxes(); });
+		).then(() => { if (!cancelled) void refetchMailboxes(); });
 		return () => { cancelled = true; };
 	}, [emailAddresses, mailboxes, refetchMailboxes]);
 
@@ -614,7 +614,12 @@ export default function HomeRoute() {
 					<Dialog.Title className="text-base font-semibold mb-5">
 						Create New Mailbox
 					</Dialog.Title>
-					<form onSubmit={handleCreate} className="space-y-4">
+					<form
+						onSubmit={(e) => {
+							void handleCreate(e);
+						}}
+						className="space-y-4"
+					>
 						{createError && (
 							<Text variant="error" size="sm">
 								{createError}
@@ -719,7 +724,9 @@ export default function HomeRoute() {
 							variant="destructive"
 							size="sm"
 							loading={isDeleting}
-							onClick={handleDelete}
+							onClick={() => {
+								void handleDelete();
+							}}
 						>
 							Delete
 						</Button>

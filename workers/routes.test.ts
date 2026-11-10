@@ -39,61 +39,71 @@ function makeHarness({ mailboxes = [MAILBOX_ID] }: { mailboxes?: string[] } = {}
 	objects.set("attachments/email-1/att-1/report.pdf", "pdf-bytes");
 
 	const bucket = {
-		head: vi.fn(async (key: string) => (objects.has(key) ? { key } : null)),
-		get: vi.fn(async (key: string) => {
+		head: vi.fn((key: string) => Promise.resolve(objects.has(key) ? { key } : null)),
+		get: vi.fn((key: string): Promise<{ body: string; json: () => Promise<unknown> } | null> => {
 			const value = objects.get(key);
-			if (value === undefined) return null;
-			return { body: value, json: async () => JSON.parse(value) };
+			if (value === undefined) return Promise.resolve(null);
+			return Promise.resolve({ body: value, json: () => Promise.resolve(JSON.parse(value) as unknown) });
 		}),
-		put: vi.fn(async (key: string, value: string) => {
+		put: vi.fn((key: string, value: string) => {
 			objects.set(key, value);
+			return Promise.resolve();
 		}),
-		delete: vi.fn(async (keys: string | string[]) => {
+		delete: vi.fn((keys: string | string[]) => {
 			for (const key of [keys].flat()) objects.delete(key);
+			return Promise.resolve();
 		}),
-		list: vi.fn(async () => ({
-			objects: [...objects.keys()]
-				.filter((key) => key.startsWith("mailboxes/"))
-				.map((key) => ({ key })),
-			truncated: false,
-		})),
+		list: vi.fn(() =>
+			Promise.resolve({
+				objects: [...objects.keys()]
+					.filter((key) => key.startsWith("mailboxes/"))
+					.map((key) => ({ key })),
+				truncated: false,
+			}),
+		),
 	};
 
 	const stub = {
-		getFolders: vi.fn(async () => [{ id: "inbox", name: "Inbox" }]),
-		getInboxUnreadCount: vi.fn(async () => 2),
-		getAttentionSummary: vi.fn(async () => ZERO_ATTENTION),
-		getEmails: vi.fn(async () => [{ id: "email-1" }]),
-		countEmails: vi.fn(async () => 1),
-		getThreadedEmails: vi.fn(async () => [{ id: "email-1" }]),
-		countThreadedEmails: vi.fn(async () => 1),
-		getEmail: vi.fn(async (id: string) => (id === ORIGINAL_EMAIL.id ? ORIGINAL_EMAIL : null)),
-		updateEmail: vi.fn(async (id: string, patch: object) =>
-			id === ORIGINAL_EMAIL.id ? { ...ORIGINAL_EMAIL, ...patch } : null,
+		getFolders: vi.fn(() => Promise.resolve([{ id: "inbox", name: "Inbox" }])),
+		getInboxUnreadCount: vi.fn(() => Promise.resolve(2)),
+		getAttentionSummary: vi.fn(() => Promise.resolve(ZERO_ATTENTION)),
+		getEmails: vi.fn(() => Promise.resolve([{ id: "email-1" }])),
+		countEmails: vi.fn(() => Promise.resolve(1)),
+		getThreadedEmails: vi.fn(() => Promise.resolve([{ id: "email-1" }])),
+		countThreadedEmails: vi.fn(() => Promise.resolve(1)),
+		getEmail: vi.fn((id: string) =>
+			Promise.resolve(id === ORIGINAL_EMAIL.id ? ORIGINAL_EMAIL : null),
 		),
-		deleteEmail: vi.fn(async (id: string) =>
-			id === ORIGINAL_EMAIL.id ? [{ id: "att-1", filename: "report.pdf" }] : null,
+		updateEmail: vi.fn((id: string, patch: object) =>
+			Promise.resolve(id === ORIGINAL_EMAIL.id ? { ...ORIGINAL_EMAIL, ...patch } : null),
 		),
-		moveEmail: vi.fn(async (id: string, folderId: string) => id === ORIGINAL_EMAIL.id && folderId === "archive"),
-		getThreadEmails: vi.fn(async () => [ORIGINAL_EMAIL]),
-		markThreadRead: vi.fn(async () => {}),
-		checkSendRateLimit: vi.fn(async (): Promise<string | null> => null),
-		createEmail: vi.fn(async () => {}),
-		createFolder: vi.fn(async (id: string, name: string) =>
-			id === "inbox" ? null : { id, name },
+		deleteEmail: vi.fn((id: string) =>
+			Promise.resolve(id === ORIGINAL_EMAIL.id ? [{ id: "att-1", filename: "report.pdf" }] : null),
 		),
-		updateFolder: vi.fn(async (id: string, name: string) =>
-			id === "custom" ? { id, name } : null,
+		moveEmail: vi.fn((id: string, folderId: string) =>
+			Promise.resolve(id === ORIGINAL_EMAIL.id && folderId === "archive"),
 		),
-		deleteFolder: vi.fn(async (id: string) => id === "custom"),
-		searchEmails: vi.fn(async () => [{ id: "email-1" }]),
-		countSearchResults: vi.fn(async () => 1),
-		getAttachment: vi.fn(async (id: string) =>
-			id === "att-1" ? { id, filename: "report.pdf", mimetype: "application/pdf" } : null,
+		getThreadEmails: vi.fn(() => Promise.resolve([ORIGINAL_EMAIL])),
+		markThreadRead: vi.fn(() => Promise.resolve()),
+		checkSendRateLimit: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+		createEmail: vi.fn(() => Promise.resolve()),
+		createFolder: vi.fn((id: string, name: string) =>
+			Promise.resolve(id === "inbox" ? null : { id, name }),
+		),
+		updateFolder: vi.fn((id: string, name: string) =>
+			Promise.resolve(id === "custom" ? { id, name } : null),
+		),
+		deleteFolder: vi.fn((id: string) => Promise.resolve(id === "custom")),
+		searchEmails: vi.fn(() => Promise.resolve([{ id: "email-1" }])),
+		countSearchResults: vi.fn(() => Promise.resolve(1)),
+		getAttachment: vi.fn((id: string) =>
+			Promise.resolve(
+				id === "att-1" ? { id, filename: "report.pdf", mimetype: "application/pdf" } : null,
+			),
 		),
 	};
 
-	const emailBinding = { send: vi.fn(async () => ({ messageId: "sent-1" })) };
+	const emailBinding = { send: vi.fn(() => Promise.resolve({ messageId: "sent-1" })) };
 
 	const env = {
 		BUCKET: bucket,
@@ -174,7 +184,7 @@ describe("mailbox routes", () => {
 		const { request } = makeHarness();
 		const res = await request("/api/v1/attention");
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as { mailboxCount: number; mailboxDirectoryStatus: string };
+		const body = await res.json<{ mailboxCount: number; mailboxDirectoryStatus: string }>();
 		expect(body.mailboxCount).toBe(1);
 		expect(body.mailboxDirectoryStatus).toBe("ok");
 	});
@@ -184,7 +194,7 @@ describe("mailbox routes", () => {
 		bucket.list.mockRejectedValueOnce(new Error("R2 down"));
 		vi.spyOn(console, "error").mockImplementationOnce(() => {});
 		const res = await request("/api/v1/attention");
-		const body = (await res.json()) as { mailboxDirectoryStatus: string };
+		const body = await res.json<{ mailboxDirectoryStatus: string }>();
 		expect(body.mailboxDirectoryStatus).toBe("unavailable");
 	});
 

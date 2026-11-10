@@ -46,26 +46,27 @@ function makeHarness(settings: unknown, forward?: (rcptTo: string) => Promise<un
 	const storedFolders: unknown[] = [];
 	const mailboxKey = `mailboxes/${MAILBOX_ID}.json`;
 
-	const createEmail: CreateEmailSpy = vi.fn(async (folder: unknown) => {
+	const createEmail: CreateEmailSpy = vi.fn((folder: unknown) => {
 		order.push("createEmail");
 		storedFolders.push(folder);
+		return Promise.resolve();
 	});
 
 	const stub = {
 		createEmail,
-		findThreadBySubject: vi.fn(async () => null),
-		getFolders: vi.fn(async () => ({})),
+		findThreadBySubject: vi.fn(() => Promise.resolve(null)),
+		getFolders: vi.fn(() => Promise.resolve({})),
 	};
 
 	const bucket = {
-		head: vi.fn(async (key: string) => (key === mailboxKey ? ({} as unknown) : null)),
-		get: vi.fn(async (key: string) =>
-			key === mailboxKey ? ({ json: async () => settings } as unknown) : null,
+		head: vi.fn((key: string) => Promise.resolve(key === mailboxKey ? {} : null)),
+		get: vi.fn((key: string) =>
+			Promise.resolve(key === mailboxKey ? { json: () => Promise.resolve(settings) } : null),
 		),
-		put: vi.fn(async () => {}),
+		put: vi.fn(() => Promise.resolve()),
 	};
 
-	const agentFetch = vi.fn(async () => new Response("ok"));
+	const agentFetch = vi.fn(() => Promise.resolve(new Response("ok")));
 
 	const env = {
 		BUCKET: bucket,
@@ -74,8 +75,9 @@ function makeHarness(settings: unknown, forward?: (rcptTo: string) => Promise<un
 		EMAIL_ADDRESSES: [],
 	} as unknown as Env;
 
+	const waitUntil = vi.fn();
 	const ctx = {
-		waitUntil: vi.fn(),
+		waitUntil,
 		passThroughOnException: vi.fn(),
 	} as unknown as ExecutionContext;
 
@@ -88,13 +90,13 @@ function makeHarness(settings: unknown, forward?: (rcptTo: string) => Promise<un
 			: undefined,
 	);
 
-	return { env, ctx, event, createEmail, bucket, order, storedFolders };
+	return { env, ctx, event, createEmail, bucket, order, storedFolders, waitUntil };
 }
 
 describe("mailbox forwarding on incoming mail (#14)", () => {
 	it("forwards to the configured address when forwarding is enabled", async () => {
-		const forward = vi.fn(async () => undefined);
-		const { env, ctx, event, createEmail, order } = makeHarness(
+		const forward = vi.fn(() => Promise.resolve(undefined));
+		const { env, ctx, event, createEmail, order, waitUntil } = makeHarness(
 			{ fromName: "Billing", forwarding: { enabled: true, email: FORWARD_TO } },
 			forward,
 		);
@@ -107,7 +109,7 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		expect(createEmail).toHaveBeenCalledTimes(1);
 		expect(order).toEqual(["createEmail", "forward"]);
 		// Normal inbox mail still triggers the auto-draft.
-		expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
+		expect(waitUntil).toHaveBeenCalledTimes(1);
 	});
 
 	it("still forwards when another settings section is malformed", async () => {
@@ -125,8 +127,8 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 	it("forwards mail that the spam heuristic flags", async () => {
 		// A false-positive spam classification is exactly the brand mail that must
 		// not vanish, so forwarding runs before the SPAM early return.
-		const forward = vi.fn(async () => undefined);
-		const { env, ctx, event, createEmail, order, storedFolders } = makeHarness(
+		const forward = vi.fn(() => Promise.resolve(undefined));
+		const { env, ctx, event, createEmail, order, storedFolders, waitUntil } = makeHarness(
 			{ forwarding: { enabled: true, email: FORWARD_TO } },
 			forward,
 		);
@@ -139,11 +141,11 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 		expect(forward).toHaveBeenCalledWith(FORWARD_TO);
 		expect(order).toEqual(["createEmail", "forward"]);
 		// Spam never triggers an AI auto-draft.
-		expect(ctx.waitUntil).not.toHaveBeenCalled();
+		expect(waitUntil).not.toHaveBeenCalled();
 	});
 
 	it("does not forward when forwarding is disabled", async () => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, ctx, event, createEmail } = makeHarness(
 			{ fromName: "Billing", forwarding: { enabled: false, email: FORWARD_TO } },
 			forward,
@@ -156,7 +158,7 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 	});
 
 	it("does not forward when enabled but the address is empty", async () => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, ctx, event, createEmail } = makeHarness(
 			{ fromName: "Billing", forwarding: { enabled: true, email: "" } },
 			forward,
@@ -169,7 +171,7 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 	});
 
 	it("does not forward when the mailbox has no forwarding setting", async () => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, ctx, event, createEmail } = makeHarness({ fromName: "Billing" }, forward);
 
 		await receiveEmail(event, env, ctx);
@@ -180,9 +182,7 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 
 	it("still stores the mail and does not rethrow when forward() fails", async () => {
 		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-		const forward = vi.fn(async () => {
-			throw new Error("forward exploded");
-		});
+		const forward = vi.fn(() => Promise.reject(new Error("forward exploded")));
 		const { env, ctx, event, createEmail, order } = makeHarness(
 			{ forwarding: { enabled: true, email: FORWARD_TO } },
 			forward,
@@ -203,7 +203,7 @@ describe("mailbox forwarding on incoming mail (#14)", () => {
 
 describe("forwarding opt-outs per kind of mail (#15)", () => {
 	it("does not forward spam when forwarding.spam is false, and still stores it", async () => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, ctx, event, storedFolders } = makeHarness(
 			{ forwarding: { enabled: true, email: FORWARD_TO, spam: false } },
 			forward,
@@ -217,7 +217,7 @@ describe("forwarding opt-outs per kind of mail (#15)", () => {
 	});
 
 	it("still forwards normal mail when both opt-outs are set", async () => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, ctx, event } = makeHarness(
 			{ forwarding: { enabled: true, email: FORWARD_TO, spam: false, internal: false } },
 			forward,
@@ -233,7 +233,7 @@ describe("forwarding opt-outs per kind of mail (#15)", () => {
 		[{ internal: true }, true],
 		[{ internal: false }, false],
 	])("internal owned-domain mail with %j forwards: %s", async (optOut, forwards) => {
-		const forward = vi.fn(async () => undefined);
+		const forward = vi.fn(() => Promise.resolve(undefined));
 		const { env, event } = makeHarness(
 			{ forwarding: { enabled: true, email: FORWARD_TO, ...optOut } },
 			forward,

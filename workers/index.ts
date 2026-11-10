@@ -218,7 +218,7 @@ app.post("/api/v1/mailboxes", zValidator("json", CreateMailboxBody), async (c) =
 });
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
+	const mailboxId = c.req.param("mailboxId");
 	const obj = await c.env.BUCKET.get(mailboxSettingsKey(mailboxId));
 	if (!obj) return c.json({ error: "Not found" }, 404);
 	const settings = parseMailboxSettings(await obj.json());
@@ -240,7 +240,7 @@ app.put("/api/v1/mailboxes/:mailboxId", zValidator("json", UpdateMailboxBody), a
 });
 
 app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
+	const mailboxId = c.req.param("mailboxId");
 	const key = mailboxSettingsKey(mailboxId);
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
@@ -440,7 +440,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
-async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
+async function streamToArrayBuffer(stream: ReadableStream<Uint8Array>, streamSize: number) {
 	if (streamSize > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
 	if (streamSize <= 0) throw new Error(`Invalid stream size: ${streamSize}`);
 	const result = new Uint8Array(streamSize);
@@ -449,7 +449,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
-		if (bytesRead + value.length > streamSize) { reader.cancel(); throw new Error(`Stream exceeds declared size`); }
+		if (bytesRead + value.length > streamSize) { void reader.cancel(); throw new Error(`Stream exceeds declared size`); }
 		result.set(value, bytesRead);
 		bytesRead += value.length;
 	}
@@ -465,7 +465,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
  * See: https://developers.cloudflare.com/email-service/examples/email-routing/email-storage/
  */
 type IncomingEmailEvent = {
-	raw: ReadableStream;
+	raw: ReadableStream<Uint8Array>;
 	rawSize: number;
 	from?: string;
 	to?: string;

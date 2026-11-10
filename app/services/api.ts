@@ -49,7 +49,7 @@ async function request<T>(
 
 		const contentType = res.headers.get("content-type") ?? "";
 		if (contentType.includes("application/json")) {
-			return res.json() as Promise<T>;
+			return res.json<T>();
 		}
 		return res.blob() as unknown as T;
 	} finally {

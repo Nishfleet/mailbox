@@ -97,7 +97,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		else { startCompose({ mode: "new", originalEmail: undefined, draftEmail: target }); }
 	};
 
-	const handleDeleteDraft = async (draftMsg?: Email) => {
+	const handleDeleteDraft = (draftMsg?: Email) => {
 		const target = draftMsg || email;
 		if (!mailboxId) return;
 		if (!window.confirm("Discard this draft?")) return;
@@ -111,7 +111,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		if (!mailboxId || !currentMailbox) return;
 		setIsSending(true);
 		try {
-			if (!target.recipient || !target.subject) { try { const fresh = await api.getEmail(mailboxId, target.id) as Email; if (fresh) target = fresh; } catch {} }
+			if (!target.recipient || !target.subject) { try { const fresh = await api.getEmail(mailboxId, target.id); if (fresh) target = fresh; } catch {} }
 			if (!target.recipient) { toastManager.add({ title: "Cannot send: no recipient set on this draft.", variant: "error" }); return; }
 			const toRecipients = splitEmailList(target.recipient);
 			if (toRecipients.length === 0) { toastManager.add({ title: "Cannot send: no valid recipient set on this draft.", variant: "error" }); return; }
@@ -148,7 +148,9 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				isSending={isSending}
 				moveToFolders={moveToFolders}
 				onBack={closePanel}
-				onSendDraft={() => handleSendDraft()}
+				onSendDraft={() => {
+					void handleSendDraft();
+				}}
 				onEditDraft={() => handleEditDraft()}
 				onReply={() =>
 					startCompose({ mode: "reply", originalEmail: lastReceivedMessage })
@@ -196,9 +198,13 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								isSending={isDraft ? isSending : false}
 								isExpanded={expandedMessages.has(msg.id)}
 								onToggleExpand={() => toggleExpand(msg.id)}
-								onSendDraft={isDraft ? () => handleSendDraft(msg) : undefined}
+								onSendDraft={isDraft ? () => {
+									void handleSendDraft(msg);
+								} : undefined}
 								onEditDraft={isDraft ? () => handleEditDraft(msg) : undefined}
-								onDeleteDraft={isDraft ? () => handleDeleteDraft(msg) : undefined}
+								onDeleteDraft={isDraft ? () => {
+									void handleDeleteDraft(msg);
+								} : undefined}
 								onViewSource={() => setSourceViewEmail(msg)}
 								onPreviewImage={(url, filename) =>
 									setPreviewImage({ url, filename })
