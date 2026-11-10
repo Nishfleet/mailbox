@@ -58,10 +58,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Smoke the deployed Worker
+        id: smoke
         timeout-minutes: 3
+        env:
+          SMOKE_URL: ${{ vars.PRODUCTION_SMOKE_URL }}
         run: |
+          if [ -z "$SMOKE_URL" ]; then
+            echo "::error::Repo variable PRODUCTION_SMOKE_URL is not set." >&2
+            exit 1
+          fi
           for _ in $(seq 1 12); do
-            status=$(curl -o /dev/null -s -w "%{http_code}" https://0509-support-inbox.nishant345.workers.dev/)
+            status=$(curl -o /dev/null -s -w "%{http_code}" "$SMOKE_URL")
             if [ "$status" = "200" ]; then
               exit 0
             fi
