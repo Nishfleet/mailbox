@@ -1,6 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "0509-support-inbox",
+	"workers_dev": false,
 	"preview_urls": false,
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
