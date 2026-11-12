@@ -212,7 +212,7 @@
       "count": 1
     },
     "no-comments/disallowComments": {
-      "count": 20
+      "count": 9
     }
   },
   "workers/lib/async.ts": {

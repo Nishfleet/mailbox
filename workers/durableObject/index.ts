@@ -121,6 +121,7 @@ interface EmailData {
 	message_id?: string | null;
 	raw_headers?: string | null;
 	internal_owned?: boolean;
+	injection_checked?: boolean;
 }
 
 interface AttachmentData {
@@ -151,6 +152,7 @@ type EmailRow = {
 	message_id: string | null;
 	raw_headers: string | null;
 	internal_owned: number | null;
+	injection_checked: number | null;
 };
 
 type AttachmentRow = {
@@ -648,6 +650,14 @@ export class MailboxDO extends DurableObject<Env> {
 			.run();
 
 		return this.getEmail(id);
+	}
+
+	markInjectionChecked(id: string) {
+		this.db
+			.update(schema.emails)
+			.set({ injection_checked: 1 })
+			.where(eq(schema.emails.id, id))
+			.run();
 	}
 
 	markThreadRead(threadId: string) {
@@ -1271,6 +1281,7 @@ export class MailboxDO extends DurableObject<Env> {
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
 				internal_owned: email.internal_owned ? 1 : 0,
+				injection_checked: email.injection_checked ? 1 : 0,
 			})
 			.run();
 

@@ -13,7 +13,7 @@ import { createWorkersAI } from "workers-ai-provider";
 import type { StreamTextOnFinishCallback, ToolSet } from "ai";
 import { z } from "zod";
 import type { EmailDetail } from "../../shared/email";
-import { verifyDraft, isPromptInjection } from "../lib/ai";
+import { AI_GATEWAY, verifyDraft, isPromptInjection } from "../lib/ai";
 import {
 	getMailboxStub,
 	stripHtmlToText,
@@ -293,7 +293,7 @@ export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools: ToolSet = createEmailTools(env, mailboxId, {
 			includeAttentionSummary: true,
 		});
@@ -353,7 +353,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const workersai = createWorkersAI({ binding: env.AI, gateway: AI_GATEWAY });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
 
@@ -364,6 +364,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		let emailBody = "";
 		let threadContext = "";
 		let email: EmailDetail | null = null;
+		const scannedEmailIds = new Set<string>();
 		try {
 			email = await stub.getEmail(emailData.emailId);
 		} catch (e) {
@@ -392,32 +393,37 @@ export class EmailAgent extends AIChatAgent<any> {
 
 		try {
 			if (email?.body) {
-				const isInjection = await isPromptInjection(env.AI, email.body);
-				if (isInjection) {
-					console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
-					
-					// Log to agent chat so the user knows why it skipped
-					const newMessages = [
-						{
-							id: crypto.randomUUID(),
-							role: "user" as const,
-							content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
-						},
-						{
-							id: crypto.randomUUID(),
-							role: "assistant" as const,
-							content: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions.",
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions." }],
-						},
-					];
-					await this.persistMessages([...this.messages, ...newMessages]);
-					
-					return;
+				if (!email.injection_checked) {
+					const isInjection = await isPromptInjection(env.AI, email.body);
+					if (isInjection) {
+						console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
+
+						// Log to agent chat so the user knows why it skipped
+						const newMessages = [
+							{
+								id: crypto.randomUUID(),
+								role: "user" as const,
+								content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
+								createdAt: new Date(),
+								parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
+							},
+							{
+								id: crypto.randomUUID(),
+								role: "assistant" as const,
+								content: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions.",
+								createdAt: new Date(),
+								parts: [{ type: "text" as const, text: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions." }],
+							},
+						];
+						await this.persistMessages([...this.messages, ...newMessages]);
+
+						return;
+					}
+
+					await stub.markInjectionChecked(emailData.emailId);
+					scannedEmailIds.add(emailData.emailId);
 				}
-				
+
 				emailBody = stripHtmlToText(email.body);
 			}
 
@@ -428,7 +434,16 @@ export class EmailAgent extends AIChatAgent<any> {
 				threadEmails.map(async (e) => {
 					const full = await stub.getEmail(e.id);
 					const text = full?.body ? stripHtmlToText(full.body) : "";
-					return { id: e.id, sender: e.sender, recipient: e.recipient, subject: e.subject, date: e.date, folder_id: e.folder_id, body_text: text };
+					return {
+						id: e.id,
+						sender: e.sender,
+						recipient: e.recipient,
+						subject: e.subject,
+						date: e.date,
+						folder_id: e.folder_id,
+						body_text: text,
+						injection_checked: full?.injection_checked || scannedEmailIds.has(e.id),
+					};
 				}),
 			);
 			fullThread.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -436,11 +451,17 @@ export class EmailAgent extends AIChatAgent<any> {
 				.map((e) => `[${e.date}] ${e.sender} → ${e.recipient} (${e.folder_id}): ${e.body_text.substring(0, 500)}`)
 				.join("\n\n");
 
-			// Scan thread context for prompt injection too -- an attacker
-			// could plant an injection in an earlier email in the thread
-			// that gets included in the agent's prompt.
-			if (threadContext) {
-				const threadInjection = await isPromptInjection(env.AI, threadContext);
+			// Scan only emails that have not already been checked, so an
+			// injection planted earlier still gets one scan instead of being
+			// rescanned on every reply.
+			const uncheckedThreadEmails = fullThread.filter(
+				(e) => e.body_text && !e.injection_checked,
+			);
+			if (uncheckedThreadEmails.length > 0) {
+				const uncheckedContext = uncheckedThreadEmails
+					.map((e) => `[${e.date}] ${e.sender} → ${e.recipient} (${e.folder_id}): ${e.body_text.substring(0, 500)}`)
+					.join("\n\n");
+				const threadInjection = await isPromptInjection(env.AI, uncheckedContext);
 				if (threadInjection) {
 					console.warn("Skipping auto-draft due to prompt injection in thread context:", emailData.threadId);
 					const newMessages = [
@@ -462,6 +483,10 @@ export class EmailAgent extends AIChatAgent<any> {
 					await this.persistMessages([...this.messages, ...newMessages]);
 					return;
 				}
+
+				await Promise.all(
+					uncheckedThreadEmails.map((e) => stub.markInjectionChecked(e.id)),
+				);
 			}
 		}
 		} catch (e) {
