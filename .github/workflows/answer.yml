@@ -1,20 +1,60 @@
 name: answer
-# A change request from the reviewer bot on an agent PR goes back to the fleet's worker
-# lane, which lives in fleet-ops; a failed CI run on an agent PR is forwarded the same way.
-# The stub needs its own triggers, because "the github context is always associated with
-# the caller workflow":
-# https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations
+# Two dead ends start an answer round by dispatching agent.yml on the default branch:
+# a change request on an agent PR from the reviewer bot or the repository owner (the
+# owner's hold is a decision the lane must answer), and CI completing with a failure on
+# the head of one (review.yml reads green CI only, so a red PR drew no review and no
+# answer round). The hop cannot run on the events themselves: a pull_request_review run
+# is on the PR's merge ref and a workflow_run run is on the default branch, both of
+# which environment `agent` (main only) refuses; a dispatch by GITHUB_TOKEN starts a
+# run instead.
+# https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_review
+# https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review
+# https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
+# https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs
 on:
   pull_request_review:
     types: [submitted]
-  workflow_run: # zizmor: ignore[dangerous-triggers] nothing from the pull request is checked out or run
+  workflow_run: # zizmor: ignore[dangerous-triggers] nothing from the pull request is checked out or run: the job reads event metadata only
     workflows: [CI]
     types: [completed]
 permissions: {}
 jobs:
-  answer:
-    # The lane's job dispatches agent.yml on main with the issue and the PR. A called
-    # workflow can only lower the caller's GITHUB_TOKEN permissions, never raise them.
+  dispatch:
+    # Only the two intended cases get through: a changes-requested review of an
+    # agent/issue-* PR by the approver bot or the owner, and a failed CI run on the
+    # head of one, in this repository (pull_requests is empty for fork PRs, so the
+    # branch filter is the check). Every other finished CI run — green, or on a
+    # non-agent branch or repo — and every other review stops here. The job checks
+    # nothing out and runs no pull-request code: it reads event numbers and names
+    # alone, and its one step dispatches agent.yml.
+    if: >-
+      (github.event_name == 'pull_request_review' &&
+        github.event.review.state == 'changes_requested' &&
+        (github.event.review.user.login == 'nishfleet-approver' ||
+          github.event.review.author_association == 'OWNER') &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        startsWith(github.event.pull_request.head.ref, 'agent/issue-')) ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        startsWith(github.event.workflow_run.head_branch, 'agent/issue-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # The dispatch itself is the only write. GITHUB_TOKEN-triggered workflow_dispatch
+    # is what makes the dispatched agent.yml run on the default branch, which
+    # environment `agent` admits.
     permissions: {actions: write}
-    # @main, not a SHA, the same as the agent stub.
-    uses: Nishfleet/fleet-ops/.github/workflows/answer.yml@main
+    steps:
+      - name: Dispatch the agent lane on the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN: ${{ github.event.repository.default_branch }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref || github.event.workflow_run.head_branch }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          issue=${HEAD_REF#agent/issue-}
+          case "$issue" in ''|*[!0-9]*) echo "::error::$HEAD_REF is not agent/issue-<number>"; exit 1 ;; esac
+          gh workflow run agent.yml -R "$REPO" --ref "$MAIN" -f issue="$issue" -f pr="$NUMBER"
