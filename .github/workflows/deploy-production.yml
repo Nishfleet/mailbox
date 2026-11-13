@@ -29,7 +29,62 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npx wrangler deploy
+
+      - name: Record the serving Worker version before this deploy replaces it
+        # A failed smoke test must have a version to roll back to. The latest
+        # deployment is the one actively serving traffic (~100%); its top
+        # version at 100% is the rollback target. Fails the job when no such
+        # version can be read: no way back, no deploy.
+        id: previous
+        run: |
+          payload=$(npx cf workers deployments list --worker 0509-support-inbox -q)
+          echo "$payload"
+          target=$(echo "$payload" | jq -r '[.deployments[] | .versions[]? | select(.percentage == 100) | .version_id][0] // empty')
+          if [ -z "$target" ]; then
+            echo "::error::Could not read the serving Worker version id. Refusing to deploy with no rollback target." >&2
+            exit 1
+          fi
+          echo "version_id=$target" >> "$GITHUB_OUTPUT"
+          echo "Rollback target: $target" >> "$GITHUB_STEP_SUMMARY"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy the Worker
+        id: deploy
+        run: npx cf deploy --prebuilt
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke the deployed Worker
+        id: smoke
+        timeout-minutes: 3
+        env:
+          SMOKE_URL: ${{ vars.PRODUCTION_SMOKE_URL }}
+        run: |
+          if [ -z "$SMOKE_URL" ]; then
+            echo "::error::Repo variable PRODUCTION_SMOKE_URL is not set." >&2
+            exit 1
+          fi
+          for _ in $(seq 1 12); do
+            status=$(curl -o /dev/null -s -w "%{http_code}" "$SMOKE_URL")
+            if [ "$status" = "200" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "/ returned $status after 60s; deploy did not come up healthy"
+          exit 1
+
+      - name: Roll back to the serving Worker version
+        if: always() && steps.deploy.outcome == 'success' && steps.smoke.outcome != 'success'
+        run: |
+          npx cf workers deployments create \
+            --worker 0509-support-inbox \
+            --strategy percentage \
+            --versions "[{\"version_id\":\"$ROLLBACK_TARGET\",\"percentage\":100}]"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ROLLBACK_TARGET: ${{ steps.previous.outputs.version_id }}

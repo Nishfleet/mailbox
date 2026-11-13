@@ -121,12 +121,17 @@ export function isTrustedInternalOwnedEmail(
 
 /**
  * Resolve a MailboxDO stub from a mailbox email address.
+ *
+ * cf's config-level type generator sees the worker's DO bindings as untyped
+ * namespaces (`DurableObjectNamespace<undefined>`), because this worker
+ * references itself by name. Narrow the namespace where its stub is returned,
+ * which is typed against the MailboxDO class.
  */
 export function getMailboxStub(
 	env: Env,
 	mailboxId: string,
 ): DurableObjectStub<MailboxDO> {
-	const ns = env.MAILBOX;
+	const ns = env.MAILBOX as unknown as DurableObjectNamespace<MailboxDO>;
 	const id = ns.idFromName(mailboxId);
 	return ns.get(id);
 }
