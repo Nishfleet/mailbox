@@ -37,6 +37,7 @@ Settings in `cloudflare.config.ts` under `worker.env`:
 
 | Variable | Default | Effect |
 | --- | --- | --- |
+| `ATTENTION_NOTIFY_BASE_URL` | the production Worker's URL | Base URL of the "Open Attention Desk" link in the message. |
 | `ATTENTION_NOTIFY_MIN_SIGNALS` | `1` | Minimum total attention signal count before a message can be sent. |
 | `ATTENTION_NOTIFY_COOLDOWN_MINUTES` | `60` | Window used to label the log result `unchanged-cooldown` or `unchanged` when the set did not change. It does not delay a changed set. |
 | `ATTENTION_NOTIFY_MAX_ACTIONS` | `3` | Actions listed in one message. |
@@ -45,7 +46,6 @@ Secrets, set with `cf workers secrets update <NAME>` rather than in `cloudflare.
 
 | Secret | Effect |
 | --- | --- |
-| `ATTENTION_NOTIFY_BASE_URL` | Base URL of the "Open Attention Desk" link in the message; the production Worker's URL (`https://0509-support-inbox.nishant345.workers.dev`). Locally, put it in `.dev.vars`. |
 | `PUSHOVER_APP_TOKEN` | Pushover application token. With `PUSHOVER_USER_KEY`, selects API delivery. |
 | `PUSHOVER_USER_KEY` | Pushover user key. With `PUSHOVER_APP_TOKEN`, selects API delivery. |
 | `PUSHOVER_EMAIL_ALIAS` | Pushover email alias. Selects email delivery when the API pair is not set. |
