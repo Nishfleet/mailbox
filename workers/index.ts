@@ -25,7 +25,8 @@ import { SendEmailRequestSchema } from "./lib/schemas";
 import { isHighConfidenceSpam } from "./lib/spam.js";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
-import { MailboxSettingsSchema } from "../shared/mailbox-settings";
+import { MailboxSettingsSchema, parseMailboxSettings } from "../shared/mailbox-settings";
+import { mailboxDisplayName, mailboxSettingsKey, readMailboxSettings } from "./lib/mailbox-settings";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { buildAttentionSummary } from "./lib/attention";
@@ -62,6 +63,7 @@ const DraftBody = z.object({
 });
 
 const MAILBOX_COUNT_TIMEOUT_MS = 5000;
+const MAILBOX_NAME_TIMEOUT_MS = 5000;
 const MAILBOX_COUNT_CONCURRENCY = 6;
 const MAILBOX_LIST_BUDGET_MS = 12000;
 const MAILBOX_COUNT_START_BUFFER_MS = 500;
@@ -85,6 +87,20 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	const v = c.req.query(key);
 	if (v === undefined || v === "") return undefined;
 	return v === "true" || v === "1";
+}
+
+async function getMailboxName(env: Env, mailboxId: string, timeoutMs: number): Promise<string> {
+	try {
+		const settings = await withTimeout(
+			readMailboxSettings(env, mailboxId),
+			timeoutMs,
+			() => console.warn(`Timed out loading display name for ${mailboxId}`),
+		);
+		return mailboxDisplayName(mailboxId, settings);
+	} catch (error) {
+		console.error(`Failed to load display name for ${mailboxId}`, error);
+		return mailboxId;
+	}
 }
 
 async function getInboxUnreadCount(
@@ -153,10 +169,19 @@ app.get("/api/v1/mailboxes", async (c) => {
 		allMailboxes,
 		MAILBOX_COUNT_CONCURRENCY,
 		async (m) => {
+			const nameBudgetMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
+			const name =
+				nameBudgetMs > 0
+					? await getMailboxName(
+							c.env,
+							m.id,
+							Math.min(MAILBOX_NAME_TIMEOUT_MS, nameBudgetMs),
+						)
+					: m.id;
 			const remainingMs = deadlineMs - Date.now() - MAILBOX_COUNT_START_BUFFER_MS;
 			return {
 				...m,
-				name: m.id,
+				name,
 				unreadInboxCount:
 					remainingMs > 0
 						? await getInboxUnreadCount(
@@ -182,7 +207,7 @@ app.post("/api/v1/mailboxes", zValidator("json", CreateMailboxBody), async (c) =
 	if (allowedAddresses.length > 0 && !allowedAddresses.map((a) => a.toLowerCase()).includes(email)) {
 		return c.json({ error: "Mailbox creation is restricted to configured EMAIL_ADDRESSES" }, 403);
 	}
-	const key = `mailboxes/${email}.json`;
+	const key = mailboxSettingsKey(email);
 	if (await c.env.BUCKET.head(key)) return c.json({ error: "Mailbox already exists" }, 409);
 	const defaultSettings = { fromName: name, forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
 	const finalSettings = { ...defaultSettings, ...settings };
@@ -193,24 +218,30 @@ app.post("/api/v1/mailboxes", zValidator("json", CreateMailboxBody), async (c) =
 });
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
-	const obj = await c.env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+	const mailboxId = c.req.param("mailboxId");
+	const obj = await c.env.BUCKET.get(mailboxSettingsKey(mailboxId));
 	if (!obj) return c.json({ error: "Not found" }, 404);
-	return c.json({ id: mailboxId, name: mailboxId, email: mailboxId, settings: await obj.json() });
+	const settings = parseMailboxSettings(await obj.json());
+	return c.json({
+		id: mailboxId,
+		name: mailboxDisplayName(mailboxId, settings),
+		email: mailboxId,
+		settings,
+	});
 });
 
 app.put("/api/v1/mailboxes/:mailboxId", zValidator("json", UpdateMailboxBody), async (c) => {
 	const mailboxId = c.req.param("mailboxId");
 	const { settings } = c.req.valid("json");
-	const key = `mailboxes/${mailboxId}.json`;
+	const key = mailboxSettingsKey(mailboxId);
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.put(key, JSON.stringify(settings));
-	return c.json({ id: mailboxId, name: mailboxId, email: mailboxId, settings });
+	return c.json({ id: mailboxId, name: mailboxDisplayName(mailboxId, settings), email: mailboxId, settings });
 });
 
 app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
-	const mailboxId = c.req.param("mailboxId")!;
-	const key = `mailboxes/${mailboxId}.json`;
+	const mailboxId = c.req.param("mailboxId");
+	const key = mailboxSettingsKey(mailboxId);
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
 	return c.body(null, 204);
@@ -409,7 +440,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
-async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
+async function streamToArrayBuffer(stream: ReadableStream<Uint8Array>, streamSize: number) {
 	if (streamSize > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
 	if (streamSize <= 0) throw new Error(`Invalid stream size: ${streamSize}`);
 	const result = new Uint8Array(streamSize);
@@ -418,7 +449,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
-		if (bytesRead + value.length > streamSize) { reader.cancel(); throw new Error(`Stream exceeds declared size`); }
+		if (bytesRead + value.length > streamSize) { void reader.cancel(); throw new Error(`Stream exceeds declared size`); }
 		result.set(value, bytesRead);
 		bytesRead += value.length;
 	}
@@ -434,17 +465,12 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
  * See: https://developers.cloudflare.com/email-service/examples/email-routing/email-storage/
  */
 type IncomingEmailEvent = {
-	raw: ReadableStream;
+	raw: ReadableStream<Uint8Array>;
 	rawSize: number;
 	from?: string;
 	to?: string;
 	headers?: Headers;
 	forward?: (rcptTo: string, headers?: Headers) => Promise<unknown>;
-};
-
-/** Mailbox settings shape (defaults set in the POST /api/v1/mailboxes handler). */
-type MailboxForwardingSettings = {
-	forwarding?: { enabled?: boolean; email?: string; spam?: boolean; internal?: boolean };
 };
 
 type ForwardingRule = { target: string; spam: boolean; internal: boolean };
@@ -456,17 +482,10 @@ type InboundMailKind = { spam: boolean; internalOwned: boolean };
  * Never throws: a malformed or unreadable settings object means "do not forward".
  */
 async function getForwardingRule(env: Env, mailboxId: string): Promise<ForwardingRule | null> {
-	try {
-		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
-		if (!obj) return null;
-		const forwarding = ((await obj.json()) as MailboxForwardingSettings)?.forwarding;
-		const target = forwarding?.email?.trim() ?? "";
-		if (!forwarding?.enabled || !target) return null;
-		return { target, spam: forwarding.spam !== false, internal: forwarding.internal !== false };
-	} catch (e) {
-		console.error(`Failed to read forwarding settings for ${mailboxId}:`, (e as Error).message);
-		return null;
-	}
+	const forwarding = (await readMailboxSettings(env, mailboxId))?.forwarding;
+	const target = forwarding?.email?.trim() ?? "";
+	if (!forwarding?.enabled || !target) return null;
+	return { target, spam: forwarding.spam !== false, internal: forwarding.internal !== false };
 }
 
 /**
@@ -528,7 +547,7 @@ async function receiveEmail(
 	if (!mailboxId) throw new Error("received email with no valid recipient address");
 
 	const messageId = crypto.randomUUID();
-	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+	if (!(await env.BUCKET.head(mailboxSettingsKey(mailboxId)))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
 
 	const stub = getMailboxStub(env, mailboxId);
 

@@ -54,7 +54,9 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
 }
 
 function normalizeText(value: unknown) {
-	return String(value || "").replace(/\s+/g, " ").trim();
+	if (typeof value === "string") return value.replace(/\s+/g, " ").trim();
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	return "";
 }
 
 function truncate(value: unknown, maxLength: number) {

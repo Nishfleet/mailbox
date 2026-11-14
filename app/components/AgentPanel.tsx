@@ -23,7 +23,7 @@ import { useParams } from "react-router";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useUIStore } from "~/hooks/useUIStore";
-import type { UIMessage } from "ai";
+import { getToolName, isToolUIPart, type UIMessage } from "ai";
 
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
 	get_attention_summary: {
@@ -102,9 +102,26 @@ function ToolCallBadge({
 }
 
 function getToolNameFromPart(part: UIMessage["parts"][number]): string | null {
-	if (part.type === "dynamic-tool") return (part as any).toolName ?? null;
-	if (part.type.startsWith("tool-")) return part.type.replace("tool-", "");
-	return null;
+	return isToolUIPart(part) ? getToolName(part) : null;
+}
+
+type DraftToolResult = {
+	to?: string;
+	subject?: string;
+	body?: string;
+	id?: string;
+};
+
+type LegacyToolResultPart = {
+	toolName?: string;
+	result?: DraftToolResult | null;
+};
+
+function getDraftToolResult(
+	part: UIMessage["parts"][number],
+): DraftToolResult | null {
+	const legacyPart = part as UIMessage["parts"][number] & LegacyToolResultPart;
+	return legacyPart.toolName === "draft_reply" ? legacyPart.result ?? null : null;
 }
 
 function hasDraftReplyTool(message: UIMessage): boolean {
@@ -279,7 +296,7 @@ function MessageBubble({
 							<ToolCallBadge
 								key={key}
 								toolName={toolName}
-								state={(part as any).state ?? "running"}
+								state={isToolUIPart(part) ? part.state : "running"}
 							/>
 						);
 					}
@@ -329,7 +346,7 @@ function AgentChatConnected({
 		const text = inputValue.trim();
 		if (!text || isStreaming) return;
 		setInputValue("");
-		sendMessage({ text });
+		void sendMessage({ text });
 		if (inputRef.current) inputRef.current.style.height = "auto";
 	};
 
@@ -397,9 +414,9 @@ function AgentChatConnected({
 								<button
 									key={prompt}
 									type="button"
-									onClick={() =>
-										sendMessage({ text: prompt })
-									}
+									onClick={() => {
+										void sendMessage({ text: prompt });
+									}}
 									className="text-left px-3 py-2 rounded-lg border border-kumo-line text-xs text-kumo-strong hover:bg-kumo-tint hover:border-kumo-fill-hover transition-colors cursor-pointer bg-transparent"
 								>
 									{prompt}
@@ -424,13 +441,8 @@ function AgentChatConnected({
 											id?: string;
 										} | null = null;
 										for (const part of msg.parts) {
-											if (
-												(part as any).toolName === "draft_reply" &&
-												(part as any).result
-											) {
-												draftData = (part as any).result;
-												break;
-											}
+											draftData = getDraftToolResult(part);
+											if (draftData) break;
 										}
 										if (draftData) {
 											const draftEmail = {
@@ -449,7 +461,7 @@ function AgentChatConnected({
 												draftEmail,
 											});
 										} else {
-											sendMessage({
+											void sendMessage({
 												text: "Let me edit this draft first. Show me what you have so I can modify it.",
 											});
 										}
@@ -482,7 +494,9 @@ function AgentChatConnected({
 							variant="secondary"
 							size="sm"
 							icon={<StopIcon size={14} weight="fill" />}
-							onClick={() => stop()}
+							onClick={() => {
+								void stop();
+							}}
 						>
 							Stop generating
 						</Button>

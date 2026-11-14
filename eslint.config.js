@@ -29,6 +29,10 @@ const rawAttachmentKey = {
 	selector: "TemplateLiteral[quasis.0.value.raw=/^attachments\\//]",
 	message: "Use attachmentKey() from workers/lib/attachments.ts.",
 };
+const rawMailboxSettingsKey = {
+	selector: "TemplateLiteral[quasis.0.value.raw=/^mailboxes\\//]",
+	message: "Use mailboxSettingsKey() from workers/lib/mailbox-settings.ts.",
+};
 const uncheckedBody = {
 	selector: "CallExpression[callee.object.property.name='req'][callee.property.name='json']",
 	message: "Add zValidator(\"json\", Schema) to the route and read c.req.valid(\"json\").",
@@ -49,19 +53,27 @@ export default defineConfig(
 	},
 	{
 		files: ["workers/**/*.ts"],
-		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody] },
+		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody, rawMailboxSettingsKey] },
 	},
 	{
 		files: ["workers/lib/email-helpers.ts"],
-		rules: { "no-restricted-syntax": ["error", rawAttachmentKey, uncheckedBody] },
+		rules: { "no-restricted-syntax": ["error", rawAttachmentKey, uncheckedBody, rawMailboxSettingsKey] },
 	},
 	{
 		files: ["workers/lib/attachments.ts"],
 		rules: {
-			"no-restricted-syntax": ["error", rawStub, uncheckedBody],
+			"no-restricted-syntax": ["error", rawStub, uncheckedBody, rawMailboxSettingsKey],
 			// https://eslint.org/docs/latest/rules/no-control-regex#when-not-to-use-it
 			"no-control-regex": "off",
 		},
+	},
+	{
+		files: ["workers/lib/mailbox-settings.ts"],
+		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody] },
+	},
+	{
+		files: ["workers/**/*.test.ts"],
+		rules: { "no-restricted-syntax": ["error", rawStub, rawAttachmentKey, uncheckedBody] },
 	},
 	{
 		files: ["app/**/*.{ts,tsx}"],

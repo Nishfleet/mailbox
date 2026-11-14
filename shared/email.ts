@@ -42,5 +42,6 @@ export interface EmailDetail extends Omit<EmailSummary, "snippet"> {
 	message_id: string | null;
 	raw_headers: string | null;
 	internal_owned: number | null;
+	injection_checked: number | null;
 	attachments: EmailAttachment[];
 }

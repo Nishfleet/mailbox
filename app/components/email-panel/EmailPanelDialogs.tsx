@@ -21,12 +21,20 @@ interface EmailPanelDialogsProps {
 function getSourceHeaders(msg: Email): { key: string; value: string }[] {
 	if (msg.raw_headers) {
 		try {
-			const parsed = JSON.parse(msg.raw_headers);
+			const parsed: unknown = JSON.parse(msg.raw_headers);
 			if (Array.isArray(parsed)) {
-				return parsed.map((header) => ({
-					key: header.key || header.name || "",
-					value: String(header.value || ""),
-				}));
+				const entries: unknown[] = parsed;
+				const headers: { key: string; value: string }[] = [];
+				for (const entry of entries) {
+					if (typeof entry !== "object" || entry === null) continue;
+					const record = entry as Record<string, unknown>;
+					const key = record.key ?? record.name;
+					headers.push({
+						key: typeof key === "string" ? key : "",
+						value: typeof record.value === "string" ? record.value : "",
+					});
+				}
+				return headers;
 			}
 			if (typeof parsed === "object" && parsed !== null) {
 				return Object.entries(parsed).map(([key, value]) => ({

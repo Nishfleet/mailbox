@@ -120,7 +120,7 @@ export default withSentry(
 	}),
 	{
 		fetch: app.fetch,
-		async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
 			ctx.waitUntil(
 				runAttentionNotificationCheck(env, {
 					now: new Date(controller.scheduledTime),
