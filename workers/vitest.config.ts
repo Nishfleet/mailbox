@@ -14,7 +14,7 @@ export default defineConfig({
 			{
 				plugins: [
 					cloudflareTest({
-						wrangler: { configPath: "./wrangler.jsonc" },
+						config: "./cloudflare.config.ts",
 						remoteBindings: false,
 						// "0" is the app's own auto-draft off switch: onNewEmail runs and returns
 						// before any Workers AI call, which has no local version.
