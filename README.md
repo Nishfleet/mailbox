@@ -8,6 +8,8 @@ Not to be confused with the support-report Worker in [Nishfleet/0509](https://gi
 
 Every push to `main` deploys through CI (`.github/workflows/deploy-production.yml`) after the checks pass. Do not run `npm run deploy` by hand except to recover.
 
+After the deploy the workflow records the version that was serving, asks `wrangler deployments status` whether the new version is the one serving, and rolls back to the recorded version when it is not. The app is behind Cloudflare Access, so the check never calls an HTTP route. A manual run with `fail_smoke_check` set fails the check on purpose to prove the rollback.
+
 ## Local development
 
 ```bash
