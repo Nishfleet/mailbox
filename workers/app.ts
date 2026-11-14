@@ -6,7 +6,8 @@ import { withSentry } from "@sentry/cloudflare";
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import { RouterContextProvider, createRequestHandler } from "react-router";
+import { RouterContextProvider, createContext, createRequestHandler } from "react-router";
+import type { AppLoadContext } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { runAttentionNotificationCheck } from "./lib/attention-notifications";
 import { EmailMCP } from "./mcp";
@@ -16,10 +17,30 @@ export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
 export { EmailMCP } from "./mcp";
 
+const cloudflareContext = createContext<{ env: Env; ctx: ExecutionContext }>();
+
+declare module "react-router" {
+	export interface AppLoadContext extends RouterContextProvider {
+		[key: string]: unknown;
+	}
+}
+
 const requestHandler = createRequestHandler(
 	() => import("virtual:react-router/server-build"),
 	import.meta.env.MODE,
 );
+
+function createLoadContext(c: {
+	env: Env;
+	executionCtx: unknown;
+}): AppLoadContext {
+	const provider = new RouterContextProvider() as AppLoadContext;
+	provider.set(cloudflareContext, {
+		env: c.env,
+		ctx: c.executionCtx as ExecutionContext,
+	});
+	return provider;
+}
 
 function getAccessUrls(teamDomain: string) {
 	const certsPath = "/cdn-cgi/access/certs";
@@ -95,7 +116,7 @@ app.all("/agents/*", async (c) => {
 
 // React Router catch-all: serves the SPA for all non-API routes
 app.all("*", (c) => {
-	return requestHandler(c.req.raw, new RouterContextProvider());
+	return requestHandler(c.req.raw, createLoadContext(c));
 });
 
 // Export the Hono app as the default export with an email handler.

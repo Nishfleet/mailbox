@@ -7,7 +7,7 @@
     "app/**/.client/**/*",
     "workers/**/*",
     "shared/**/*",
-    "worker-configuration.d.ts"
+    ".cloudflare/types/**/*"
   ],
   "compilerOptions": {
     "composite": true,

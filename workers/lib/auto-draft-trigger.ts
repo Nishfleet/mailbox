@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { getAgentByName } from "agents";
+import type { EmailAgent } from "../agent";
 import type { Env } from "../types";
 
 export interface AutoDraftTriggerPayload {
@@ -41,7 +42,10 @@ function logTriggerFailure(
  */
 export async function triggerAutoDraft(env: Env, payload: AutoDraftTriggerPayload): Promise<void> {
 	try {
-		const agent = await getAgentByName(env.EMAIL_AGENT, payload.mailboxId);
+		const agent = await getAgentByName(
+			env.EMAIL_AGENT as unknown as DurableObjectNamespace<EmailAgent>,
+			payload.mailboxId,
+		);
 		const response = await agent.fetch(new Request("https://agents/onNewEmail", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
