@@ -35,10 +35,11 @@ export type AutoDraftSlot = {
 
 /** Parse the configured limit; unset or invalid values fall back to the default. */
 export function parseAutoDraftDailyLimit(raw: unknown): number {
-	if (raw === undefined || raw === null || String(raw).trim() === "") {
+	const text = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+	if (text.trim() === "") {
 		return DEFAULT_AUTO_DRAFT_DAILY_LIMIT;
 	}
-	const n = Number(String(raw).trim());
+	const n = Number(text.trim());
 	if (!Number.isInteger(n) || n < 0) return DEFAULT_AUTO_DRAFT_DAILY_LIMIT;
 	return n;
 }

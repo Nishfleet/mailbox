@@ -40,16 +40,18 @@ async function deliver(agentNamespace: unknown) {
 	const mailboxKey = `mailboxes/${MAILBOX_ID}.json`;
 	const env = {
 		BUCKET: {
-			head: vi.fn(async (key: string) => (key === mailboxKey ? {} : null)),
-			get: vi.fn(async (key: string) => (key === mailboxKey ? { json: async () => ({}) } : null)),
-			put: vi.fn(async () => {}),
+			head: vi.fn((key: string) => Promise.resolve(key === mailboxKey ? {} : null)),
+			get: vi.fn((key: string) =>
+				Promise.resolve(key === mailboxKey ? { json: () => Promise.resolve({}) } : null),
+			),
+			put: vi.fn(() => Promise.resolve()),
 		},
 		MAILBOX: {
 			idFromName: (name: string) => name,
 			get: () => ({
-				createEmail: vi.fn(async () => {}),
-				findThreadBySubject: vi.fn(async () => null),
-				getFolders: vi.fn(async () => ({})),
+				createEmail: vi.fn(() => Promise.resolve()),
+				findThreadBySubject: vi.fn(() => Promise.resolve(null)),
+				getFolders: vi.fn(() => Promise.resolve({})),
 			}),
 		},
 		EMAIL_AGENT: agentNamespace,
@@ -64,10 +66,12 @@ async function deliver(agentNamespace: unknown) {
 	await Promise.all(waits);
 }
 
+type FailureLine = { event?: string; mailboxId?: string; error?: string };
+
 function failureLines(spy: MockInstance<typeof console.error>) {
 	return spy.mock.calls
 		.map((args) => {
-			try { return JSON.parse(String(args[0])); } catch { return null; }
+			try { return JSON.parse(String(args[0])) as FailureLine; } catch { return null; }
 		})
 		.filter((line) => line?.event === AUTO_DRAFT_TRIGGER_FAILED);
 }
@@ -81,7 +85,7 @@ describe("auto-draft trigger on incoming mail (#17)", () => {
 		const errors = vi.spyOn(console, "error").mockImplementation(() => {});
 		const namespace = {
 			idFromName: (name: string) => name,
-			get: () => ({ fetch: async () => { throw new Error("Durable Object reset"); } }),
+			get: () => ({ fetch: () => Promise.reject(new Error("Durable Object reset")) }),
 		};
 
 		await expect(deliver(namespace)).resolves.toBeUndefined();

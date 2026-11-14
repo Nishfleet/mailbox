@@ -128,7 +128,9 @@ export default function SettingsRoute() {
 
 				{/* Save */}
 				<div className="flex justify-end">
-					<Button variant="primary" onClick={handleSave} loading={isSaving}>
+					<Button variant="primary" onClick={() => {
+						void handleSave();
+					}} loading={isSaving}>
 						Save Changes
 					</Button>
 				</div>

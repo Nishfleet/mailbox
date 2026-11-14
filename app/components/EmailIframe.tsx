@@ -11,6 +11,11 @@ interface EmailIframeProps {
 	autoSize?: boolean;
 }
 
+interface IframeHeightMessage {
+	__emailIframeHeight: boolean;
+	height: number;
+}
+
 /**
  * Renders email HTML inside a sandboxed iframe.
  *
@@ -37,14 +42,15 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 			if (!autoSize) return;
 			// Only accept messages from our own iframe
 			if (event.source !== iframeRef.current?.contentWindow) return;
+			const data = event.data as Partial<IframeHeightMessage> | null;
 			if (
-				event.data &&
-				typeof event.data === "object" &&
-				event.data.__emailIframeHeight &&
-				typeof event.data.height === "number" &&
-				event.data.height > 0
+				data &&
+				typeof data === "object" &&
+				data.__emailIframeHeight &&
+				typeof data.height === "number" &&
+				data.height > 0
 			) {
-				setHeight(event.data.height);
+				setHeight(data.height);
 			}
 		},
 		[autoSize],

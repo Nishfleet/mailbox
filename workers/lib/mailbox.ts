@@ -11,6 +11,7 @@ import { createMiddleware } from "hono/factory";
 import type { MailboxDO } from "../durableObject";
 import type { Env } from "../types";
 import { getMailboxStub } from "./email-helpers";
+import { mailboxSettingsKey } from "./mailbox-settings";
 
 export type MailboxContext = {
 	Bindings: Env;
@@ -25,7 +26,7 @@ export const requireMailbox = createMiddleware<MailboxContext>(async (c, next) =
 	const mailboxId = decodeURIComponent(rawId);
 
 	// Verify mailbox exists
-	const key = `mailboxes/${mailboxId}.json`;
+	const key = mailboxSettingsKey(mailboxId);
 	const obj = await c.env.BUCKET.head(key);
 	if (!obj) {
 		return c.json({ error: "Not found" }, 404);

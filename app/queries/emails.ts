@@ -30,13 +30,11 @@ export function useEmails(
 			? queryKeys.emails.list(mailboxId, queryParams)
 			: ["emails", "_disabled"],
 		queryFn: async () => {
-			const data = await api.listEmails(mailboxId!, queryParams) as
-				| EmailListResponse
-				| Email[];
+			const data = await api.listEmails(mailboxId!, queryParams);
 			if (data && typeof data === "object" && "emails" in data) {
 				return {
-					emails: (data as EmailListResponse).emails ?? [],
-					totalCount: (data as EmailListResponse).totalCount ?? 0,
+					emails: data.emails ?? [],
+					totalCount: data.totalCount ?? 0,
 				};
 			}
 			const arr = Array.isArray(data) ? data : [];
@@ -55,7 +53,7 @@ export function useEmail(
 		queryKey: mailboxId && emailId
 			? queryKeys.emails.detail(mailboxId, emailId)
 			: ["emails", "_disabled_detail"],
-		queryFn: () => api.getEmail(mailboxId!, emailId!) as Promise<Email>,
+		queryFn: () => api.getEmail(mailboxId!, emailId!),
 		enabled: !!mailboxId && !!emailId,
 	});
 }
@@ -74,7 +72,7 @@ export function useThreadReplies(
 			// Single request returns all thread emails with full bodies +
 			// attachments. Eliminates the previous N+1 pattern that fired
 			// a separate getEmail call per thread message.
-			const emails = await api.getThread(mailboxId!, threadId!, { signal }) as Email[];
+			const emails = await api.getThread(mailboxId!, threadId!, { signal });
 
 			// Populate individual email detail caches so clicking a thread
 			// message in the panel doesn't re-fetch.
@@ -97,12 +95,12 @@ export function useThreadReplies(
 function useInvalidateEmailData() {
 	const qc = useQueryClient();
 	return (mailboxId: string) => {
-		qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-		qc.invalidateQueries({
+		void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+		void qc.invalidateQueries({
 			queryKey: queryKeys.folders.list(mailboxId),
 		});
-		qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-		qc.invalidateQueries({ queryKey: queryKeys.attention });
+		void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+		void qc.invalidateQueries({ queryKey: queryKeys.attention });
 	};
 }
 
@@ -181,12 +179,12 @@ export function useUpdateEmail() {
 		},
 		onSettled: (_data, _err, { mailboxId }) => {
 			// Always refetch to ensure server truth
-			qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-			qc.invalidateQueries({
+			void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+			void qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-			qc.invalidateQueries({ queryKey: queryKeys.attention });
+			void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			void qc.invalidateQueries({ queryKey: queryKeys.attention });
 		},
 	});
 }
@@ -200,12 +198,12 @@ export function useMarkThreadRead() {
 		}: { mailboxId: string; threadId: string }) =>
 			api.markThreadRead(mailboxId, threadId),
 		onSuccess: (_data, { mailboxId }) => {
-			qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-			qc.invalidateQueries({
+			void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+			void qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-			qc.invalidateQueries({ queryKey: queryKeys.attention });
+			void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+			void qc.invalidateQueries({ queryKey: queryKeys.attention });
 		},
 	});
 }

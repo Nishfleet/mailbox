@@ -47,7 +47,12 @@ export default function ComposeEmail() {
 				<Dialog.Title className="text-lg font-semibold mb-5">
 					{formTitle}
 				</Dialog.Title>
-				<form onSubmit={(e) => handleSend(e, closeComposeModal)} className="space-y-4">
+				<form
+					onSubmit={(e) => {
+						void handleSend(e, closeComposeModal);
+					}}
+					className="space-y-4"
+				>
 					{error && <Banner variant="error" text={error} />}
 					<div className="flex items-center gap-2">
 						<div className="flex-1">
@@ -124,7 +129,9 @@ export default function ComposeEmail() {
 								loading={isSavingDraft}
 								disabled={isSending}
 								icon={<FloppyDiskIcon size={14} />}
-								onClick={handleSaveDraft}
+								onClick={() => {
+									void handleSaveDraft();
+								}}
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
