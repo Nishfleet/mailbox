@@ -31,6 +31,7 @@ import {
 	toolMoveEmail,
 	toolDiscardDraft,
 } from "../lib/tools";
+import type { AgentToolName } from "../lib/tool-names";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
 import type { Env } from "../types";
 import { parseAutoDraftDailyLimit, takeAutoDraftSlot } from "../lib/auto-draft-budget";
@@ -106,6 +107,8 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
 	}
 	return DEFAULT_SYSTEM_PROMPT;
 }
+
+const DRAFT_TOOL_NAMES = ["draft_reply", "draft_email"] as const satisfies readonly AgentToolName[];
 
 function createEmailTools(
 	env: Env,
@@ -279,7 +282,7 @@ function createEmailTools(
 				return toolDiscardDraft(env, mailboxId, draftId);
 			},
 		}),
-	};
+	} satisfies Record<AgentToolName, unknown>;
 
 	return options.includeAttentionSummary
 		? { get_attention_summary: attentionSummaryTool, ...mailboxTools }
@@ -543,7 +546,7 @@ Based on the email content and thread context above, draft a reply using draft_r
 			// Check if draft_reply was called (saves to Drafts as side effect).
 			// If NOT, save the agent's text response as a draft directly.
 			const draftToolCalled = result.steps.some((step) =>
-				step.toolCalls.some((tc) => tc.toolName === "draft_reply" || tc.toolName === "draft_email"),
+				step.toolCalls.some((tc) => DRAFT_TOOL_NAMES.some((name) => name === tc.toolName)),
 			);
 
 			if (!draftToolCalled && result.text.trim()) {
