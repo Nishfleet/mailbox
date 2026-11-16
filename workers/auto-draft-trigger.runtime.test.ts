@@ -38,7 +38,7 @@ it("reaches onNewEmail on the real EmailAgent with its name set, and logs no fai
 	expect(warnings.mock.calls.map(([line]) => String(line)))
 		.toContainEqual(expect.stringContaining(`Auto-draft daily limit reached for ${mailboxId}`));
 
-	const agent = await getAgentByName(testEnv.EMAIL_AGENT, mailboxId);
+	const agent = await getAgentByName(testEnv.EMAIL_AGENT as unknown as DurableObjectNamespace<EmailAgent>, mailboxId);
 	await runInDurableObject(agent, (instance: EmailAgent) => {
 		expect(instance.name).toBe(mailboxId);
 	});
@@ -47,7 +47,7 @@ it("reaches onNewEmail on the real EmailAgent with its name set, and logs no fai
 it("logs a non-2xx answer from onNewEmail as one line without customer data", async () => {
 	const mailboxId = "support@0509.io";
 	const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-	const agent = await getAgentByName(testEnv.EMAIL_AGENT, mailboxId);
+	const agent = await getAgentByName(testEnv.EMAIL_AGENT as unknown as DurableObjectNamespace<EmailAgent>, mailboxId);
 	await runInDurableObject(agent, (instance: EmailAgent) => {
 		vi.spyOn(instance, "handleNewEmail").mockRejectedValue(new Error("draft failed"));
 	});
