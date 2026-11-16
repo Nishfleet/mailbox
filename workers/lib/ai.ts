@@ -10,6 +10,7 @@
  */
 
 import { escapeHtml, stripHtmlToText, textToHtml } from "./email-helpers";
+import { AGENT_TOOL_NAMES } from "./tool-names";
 
 export const AI_GATEWAY = { id: "default" };
 
@@ -76,15 +77,26 @@ An artifact is text the assistant wrote about its own drafting process, such as 
 
 Return ONLY the exact artifact text to remove, copied from the input. If none of the input is an artifact, return NONE. Never rewrite or summarize the email.`;
 
+const AGENT_TOOL_SOURCE = AGENT_TOOL_NAMES.join("|");
+
 const ARTIFACT_SPAN_PATTERNS = [
-	/```[\w-]*\s*\n?[\s\S]*?(?:"(?:name|tool|function)"\s*:\s*"[^"]*(?:draft_reply|draft_email|get_email|get_thread|list_emails|search_emails|mark_email_read|move_email|discard_draft)[^"]*"|"arguments"\s*:)[\s\S]*?```/gi,
+	new RegExp(
+		'```[\\w-]*\\s*\\n?[\\s\\S]*?(?:"(?:name|tool|function)"\\s*:\\s*"[^"]*(?:' + AGENT_TOOL_SOURCE + ')[^"]*"|"arguments"\\s*:)[\\s\\S]*?```',
+		"gi",
+	),
 	/<tool_call>[\s\S]*?<\/tool_call>/gi,
-	/\{\s*"(?:name|tool|function)"\s*:\s*"[^"]*(?:draft_reply|draft_email|get_email|get_thread|list_emails|search_emails|mark_email_read|move_email|discard_draft)[^"]*"[\s\S]*?\}\s*(?=\r?\n|$)/gi,
+	new RegExp(
+		'\\{\\s*"(?:name|tool|function)"\\s*:\\s*"[^"]*(?:' + AGENT_TOOL_SOURCE + ')[^"]*"[\\s\\S]*?\\}\\s*(?=\\r?\\n|$)',
+		"gi",
+	),
 	/^[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,2})?(?:sure[,.!]?[ \t]+)?here(?:'s| is)\b[^\n]*?\b(?:draft|reply|response|version|cleaned|rewritten|revised|updated|email(?=\s*(?::|\r?\n|$)))\b[^\n:]*?(?::[ \t]*(?:\*{1,2})?[ \t]*|\r?\n|$)/gim,
 	/^[ \t]*(?:\*{1,2})?draft(?:\s+(?:saved|created|updated|ready))?[.!:]?[ \t]*(?:\*{1,2})?[ \t]*(?:\r?\n|$)/gim,
 	/^[ \t]*(?:\*{1,2})?draft(?:\s+(?:reply|email))?[ \t]*:[ \t]*(?:\*{1,2})?[ \t]*/gim,
 	/^[ \t]*(?:drafted via|drafted using|i(?:'ve| have) drafted|the operator can review|draft saved|draft created|called get_email|\[auto-triggered\])[^\n]*(?:\r?\n|$)/gim,
-	/^[ \t]*(?:called|used|ran|invoked|tool(?: call)?[:\s]+)?`?(?:draft_reply|draft_email|get_email|get_thread|list_emails|search_emails|mark_email_read|move_email|discard_draft)`?\b[^\n]*(?:\r?\n|$)/gim,
+	new RegExp(
+		'^[ \\t]*(?:called|used|ran|invoked|tool(?: call)?[:\\s]+)?`?(?:' + AGENT_TOOL_SOURCE + ')`?\\b[^\\n]*(?:\\r?\\n|$)',
+		"gim",
+	),
 ];
 
 type ArtifactSpan = { start: number; end: number; text: string };
