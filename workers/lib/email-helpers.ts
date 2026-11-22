@@ -128,7 +128,7 @@ export function getMailboxStub(
 ): DurableObjectStub<MailboxDO> {
 	const ns = env.MAILBOX;
 	const id = ns.idFromName(mailboxId);
-	return ns.get(id);
+	return ns.get(id) as DurableObjectStub<MailboxDO>;
 }
 
 // ── Mailbox Listing ────────────────────────────────────────────────
