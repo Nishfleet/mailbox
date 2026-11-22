@@ -21,7 +21,7 @@ jobs:
     # https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations
     permissions: {issues: read}
     # @main, not a SHA: runner group "agent" admits only agent.yml@refs/heads/main.
-    uses: Nishfleet/fleet-ops/.github/workflows/agent.yml@main
+    uses: Nishfleet/fleet-ops/.github/workflows/agent.yml@main # zizmor: ignore[unpinned-uses] the owner's own paved road, like review.yml
     with:
       issue: ${{ github.event.issue.number || inputs.issue }}
       pr: ${{ inputs.pr }}

@@ -3,10 +3,24 @@ name: Deploy production
 # exact tree it ships, so a red main never deploys. No workflow_run trigger and no
 # Actions cache, because a deploy holds secrets (https://docs.zizmor.sh/audits/#dangerous-triggers,
 # https://docs.zizmor.sh/audits/#cache-poisoning).
+#
+# It smokes the deploy through Cloudflare's CLI (wrangler): record the version that is
+# serving before the deploy, deploy, then ask `wrangler deployments status` whether the
+# new version is the one serving and roll back to the recorded version when it is not
+# (the shape seo-fix-kit's deploy job uses). The app sits behind Cloudflare Access, so
+# the check goes through the CLI's deployment status rather than an HTTP route: every
+# route requires an Access token and no check that would bypass the wall belongs here.
+# A manual run with `fail_smoke_check` fails the check on purpose to prove the rollback.
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      fail_smoke_check:
+        description: Deliberately fail the serving-version check to exercise the rollback.
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -14,10 +28,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    # Deploys land on main; the manual dispatch also works from a test branch to prove
+    # the failed-check rollback without touching main.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,7 +48,39 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npx wrangler deploy
+      - name: Record the version that is serving before the deploy
+        id: before
+        run: |
+          set -euo pipefail
+          npx wrangler deployments status --json > deployment-status-before.json
+          version=$(node .github/scripts/serving-version.mjs deployment-status-before.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Deploy
+        id: deploy
+        run: |
+          set -euo pipefail
+          npx wrangler deploy 2>&1 | tee deploy.log
+          version=$(sed -n 's/^Current Version ID: //p' deploy.log | tail -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Check the new version is the one serving, roll back if it is not
+        run: |
+          set -euo pipefail
+          npx wrangler deployments status --json > deployment-status-after.json
+          serving=$(node .github/scripts/serving-version.mjs deployment-status-after.json)
+          if [ "$DELIBERATELY_FAIL" = "true" ]; then
+            echo "fail_smoke_check is set, so the serving-version check fails on purpose."
+          elif [ -n "$EXPECTED_VERSION" ] && [ "$EXPECTED_VERSION" = "$serving" ]; then
+            echo "Smoke check passed: version $EXPECTED_VERSION is the one serving."
+            exit 0
+          elif [ -z "$EXPECTED_VERSION" ]; then
+            echo "wrangler deploy did not report a Current Version ID, so what is serving is unknown."
+          else
+            echo "The version serving is $serving, but the deploy reported $EXPECTED_VERSION."
+          fi
+          echo "Rolling back to the version recorded before the deploy: $RECORDED_VERSION"
+          npx wrangler rollback "$RECORDED_VERSION" --yes --message "smoke check failed: rolled back to the version serving before this deploy"
+          exit 1
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_VERSION: ${{ steps.deploy.outputs.version }}
+          DELIBERATELY_FAIL: ${{ inputs.fail_smoke_check }}
+          RECORDED_VERSION: ${{ steps.before.outputs.version }}
