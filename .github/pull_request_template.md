@@ -4,7 +4,7 @@
 
 ## Try this
 
-<!-- Where the owner can try it (a link, or the command), then: -->
+Preview link: the "View deployment" button below, once the `preview` check is green. It opens after Cloudflare Access sign-in.
 
 1. Open it.
 2. Do this: <!-- one action, in plain words -->
